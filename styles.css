@@ -223,23 +223,6 @@ html {
 	padding: 8px 12px;
 }
 
-.speed-boost-button {
-	background: linear-gradient(135deg, #ff6b00 0%, #ff8800 100%);
-	font-weight: bold;
-	padding: 8px 15px;
-	box-shadow: 0 3px 8px rgba(255, 107, 0, 0.4);
-}
-
-.speed-boost-button:hover {
-	background: linear-gradient(135deg, #ff8800 0%, #ffaa00 100%);
-	box-shadow: 0 4px 12px rgba(255, 107, 0, 0.6);
-}
-
-.speed-boost-button:active {
-	transform: scale(0.95);
-	box-shadow: 0 2px 4px rgba(255, 107, 0, 0.4);
-}
-
 .refresh-button {
 	margin-left: auto;
 }
@@ -266,19 +249,11 @@ html {
 	width: 125px;
 }
 
-.user-input.collapsed .speed-boost-button {
-	display: none;
-}
-
 .user-input.collapsed .storages-button {
 	display: none;
 }
 
 .user-input.collapsed .transfers-button {
-	display: none;
-}
-
-.user-input.collapsed .refresh-button {
 	display: none;
 }
 

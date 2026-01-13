@@ -10331,8 +10331,12 @@
             u = ea(e, a, i),
             {
                 storages: l
-            } = await te(e, `storages/${a}`, i),
-            m = l.map(g => oe(g.name, g.inventory, a.toString(), n)).filter(g => g !== null);
+            } = await te(e, `storages/${a}`, i);
+        console.log("Raw API storages response:", l.map(g => ({
+            name: g.name,
+            itemCount: Object.keys(g.inventory || {}).length
+        })));
+        let m = l.map(g => oe(g.name, g.inventory, a.toString(), n)).filter(g => g !== null);
         if (n) try {
             let g = await te(e, "faction/perks.json", i);
             if (g && Array.isArray(g) && g[1]) {
@@ -10352,6 +10356,24 @@
             }
         } catch (g) {
             console.warn("Failed to fetch faction perks:", g)
+        }
+        try {
+            let g = await te(e, `getuserbiz/${a}`, i);
+            console.log("User businesses response:", g);
+            if (Array.isArray(g)) {
+                let h = g.filter(p => p === "biz_train" || p.includes("train")).length;
+                console.log(`User has ${h} train stations`);
+                if (h > 0) {
+                    let p = m.find(f => f.storage.id === "biz_train"),
+                        f = 51785 * h;
+                    p && (console.log(`Updating Train Network capacity from ${p.storage.size} to ${f} (${h} stations x 51,785 kg)`), p.storage = {
+                        ...p.storage,
+                        size: f
+                    })
+                }
+            }
+        } catch (g) {
+            console.warn("Failed to fetch user businesses:", g)
         }
         return m.push(await s), m.push(await o), m.push(...await u), m.sort(({
             storage: g
@@ -13340,7 +13362,12 @@ ${d.stack}` : typeof d == "object" ? JSON.stringify(d) : String(d)).join(" ");
             items: C.items,
             itemCount: C.items.length
         })));
-        if (n.length === 0) return;
+        if (n.length === 0) {
+            console.warn("⚠️ No faction or train storage found in user storages!");
+            return
+        }
+        if (!n.find(C => C.storage.id === "faction")) console.warn("⚠️ Faction storage not found!");
+        if (!n.find(C => C.storage.id === "biz_train")) console.warn("⚠️ Train Network storage not found!");
         n.forEach(({
             storage: C,
             items: T
@@ -13413,29 +13440,25 @@ ${d.stack}` : typeof d == "object" ? JSON.stringify(d) : String(d)).join(" ");
             console.log(`  Recipe needs: ${T.recipeNeeded.toLocaleString()} kg`);
             console.log(`  Total: ${T.totalNeeded.toLocaleString()} kg / ${T.capacity.toLocaleString()} kg`);
             console.log(`  Will exceed? ${T.totalNeeded > T.capacity}`);
-            let I = Object.entries(T.items).sort((v, N) => N[1] - v[1]).slice(0, 5).map(v => `${v[0]}: ${v[1].toLocaleString()}`).join(", "),
-                v = document.createElement("div"),
-                N = document.createElement("div"),
-                P = document.createElement("div");
             if (T.totalNeeded > T.capacity) {
-                m++, console.log(`Adding EXCEEDED warning for ${T.name}`), v.className = "storage-warning", N.className = "storage-warning-title", N.textContent = `⚠ ${T.name} Capacity Exceeded`, P.className = "storage-warning-details", P.innerHTML = `
+                m++;
+                console.log(`Adding warning for ${T.name}`);
+                let I = Object.entries(T.items).sort((v, N) => N[1] - v[1]).slice(0, 5).map(v => `${v[0]}: ${v[1].toLocaleString()}`).join(", "),
+                    v = document.createElement("div");
+                v.className = "storage-warning";
+                let N = document.createElement("div");
+                N.className = "storage-warning-title", N.textContent = `⚠ ${T.name} Capacity Exceeded`;
+                let P = document.createElement("div");
+                P.className = "storage-warning-details", P.innerHTML = `
                 <div><strong>Capacity:</strong> ${T.capacity.toLocaleString()} kg</div>
                 <div><strong>Current Usage:</strong> ${Math.round(T.currentUsed).toLocaleString()} kg</div>
                 <div><strong>Recipe Needs:</strong> ${Math.round(T.recipeNeeded).toLocaleString()} kg</div>
                 <div><strong>Total Needed:</strong> ${Math.round(T.totalNeeded).toLocaleString()} kg</div>
                 <div><strong>Overage:</strong> ${Math.round(T.totalNeeded-T.capacity).toLocaleString()} kg (${Math.round((T.totalNeeded-T.capacity)/T.capacity*100)}%)</div>
                 <div style="margin-top: 5px;"><strong>Top raw materials needed:</strong> ${I}</div>
-            `
-            } else console.log(`Adding OK status for ${T.name}`), v.className = "storage-warning", v.style.backgroundColor = "rgba(76, 175, 80, 0.2)", v.style.borderColor = "#4caf50", v.style.borderLeftColor = "#4caf50", N.className = "storage-warning-title", N.textContent = `✓ ${T.name} Capacity OK`, N.style.color = "#4caf50", P.className = "storage-warning-details", P.innerHTML = `
-                <div><strong>Capacity:</strong> ${T.capacity.toLocaleString()} kg</div>
-                <div><strong>Current Usage:</strong> ${Math.round(T.currentUsed).toLocaleString()} kg (${Math.round(T.currentUsed/T.capacity*100)}%)</div>
-                <div><strong>Recipe Needs:</strong> ${Math.round(T.recipeNeeded).toLocaleString()} kg</div>
-                <div><strong>Total Needed:</strong> ${Math.round(T.totalNeeded).toLocaleString()} kg (${Math.round(T.totalNeeded/T.capacity*100)}%)</div>
-                <div><strong>Available Space:</strong> ${Math.round(T.capacity-T.totalNeeded).toLocaleString()} kg</div>
-                <div style="margin-top: 5px;"><strong>Top raw materials needed:</strong> ${I}</div>
-            `;
-            v.appendChild(N), v.appendChild(P), i.appendChild(v), console.log("Storage status element added to DOM")
-        }), console.log(`Total storage panels added: ${Object.keys(s).length}, warnings: ${m}`), console.log("Storage container has content:", i.innerHTML.length > 0)
+            `, v.appendChild(N), v.appendChild(P), i.appendChild(v), console.log("Warning element added to DOM:", v)
+            }
+        }), console.log(`Total warnings added: ${m}`), console.log("Storage warnings container HTML:", i.innerHTML.substring(0, 200))
     }
     async function Kt() {
         let e = document.getElementById("error"),
@@ -13563,16 +13586,8 @@ ${d.stack}` : typeof d == "object" ? JSON.stringify(d) : String(d)).join(" ");
             i.textContent = `Error: ${o.message}`, console.error(o)
         }
     }
-    function Yr() {
-        console.log("Speed boost activated!");
-        window.parent.postMessage({
-            type: "speedBoost",
-            boost: 50
-        }, "*")
-    }
     window.saveApiKey = Jr;
     window.refresh = qr;
-    window.applySpeedBoost = Yr;
     document.addEventListener("DOMContentLoaded", function() {
         _t(), Wt(), Gt(), J(), b(), setTimeout(() => {
             window.parent.postMessage({
