@@ -10333,6 +10333,26 @@
                 storages: l
             } = await te(e, `storages/${a}`, i),
             m = l.map(g => oe(g.name, g.inventory, a.toString(), n)).filter(g => g !== null);
+        if (n) try {
+            let g = await te(e, "faction/perks.json", i);
+            if (g && Array.isArray(g) && g[1]) {
+                let h = g[1].find(p => p.item === "self_storage");
+                if (h && h.data) try {
+                    let p = JSON.parse(h.data);
+                    if (p.size) {
+                        let f = m.find(d => d.storage.id === "faction");
+                        f && (console.log(`Updating Faction Storage capacity from ${f.storage.size} to ${p.size}`), f.storage = {
+                            ...f.storage,
+                            size: p.size
+                        })
+                    }
+                } catch (p) {
+                    console.warn("Failed to parse faction storage size:", p)
+                }
+            }
+        } catch (g) {
+            console.warn("Failed to fetch faction perks:", g)
+        }
         return m.push(await s), m.push(await o), m.push(...await u), m.sort(({
             storage: g
         }, {
@@ -10599,14 +10619,25 @@
             },
             u = 0,
             l = 0,
-            m = 0;
+            m = 0,
+            b = [];
         for (let g of o.nodes) {
             let h = g.data.steps[0];
             if (h && h.solution.type === L.Recipe) {
                 let p = h.solution,
                     f = g.data.steps.reduce((S, C) => S + (C.solution.type === L.Recipe ? C.solution.recipeAmount : 0), 0),
-                    y = (p.optimalProcessingRecipesPerRun === p.maxLoadRecipesPerRun ? !0 : a) ? p.optimalProcessingRecipesPerRun : p.maxLoadRecipesPerRun;
-                l += Math.ceil(f / y), p.recipe.cost > 0 ? u += p.recipe.cost * f : m += -p.recipe.cost * f
+                    y = (p.optimalProcessingRecipesPerRun === p.maxLoadRecipesPerRun ? !0 : a) ? p.optimalProcessingRecipesPerRun : p.maxLoadRecipesPerRun,
+                    S = p.recipe.cost * f;
+                l += Math.ceil(f / y), p.recipe.cost > 0 ? u += S : m += -S;
+                if (p.recipe.cost > 0) {
+                    let C = b.find(T => T.name === p.recipe.name);
+                    C ? (C.totalCost += S, C.count += f) : b.push({
+                        name: p.recipe.name,
+                        totalCost: S,
+                        unitCost: p.recipe.cost,
+                        count: f
+                    })
+                }
             }
         }
         return {
@@ -10614,7 +10645,8 @@
             info: {
                 totalCost: u,
                 totalRuns: l,
-                totalRevenue: m
+                totalRevenue: m,
+                breakdown: b
             }
         }
     }
@@ -13257,6 +13289,154 @@ ${d.stack}` : typeof d == "object" ? JSON.stringify(d) : String(d)).join(" ");
         let a = document.getElementById("trailer").value;
         a && e.push(a), localStorage.setItem("vehicles", JSON.stringify(e))
     }
+
+    function displayCostBreakdown(e) {
+        let a = document.getElementById("cost-breakdown-body"),
+            i = document.getElementById("breakdown-total-cost"),
+            n = document.getElementById("breakdown-per-unit-cost"),
+            s = document.getElementById("cost-breakdown-container");
+        if (!e || e.length === 0) {
+            s.style.display = "none";
+            return
+        }
+        s.style.display = "block", a.innerHTML = "";
+        let o = 0;
+        e.forEach(u => {
+            let l = document.createElement("tr"),
+                m = document.createElement("td");
+            m.textContent = u.name;
+            let g = document.createElement("td");
+            g.textContent = "$" + u.totalCost.toLocaleString();
+            let h = document.createElement("td");
+            h.textContent = "$" + u.unitCost.toLocaleString(), l.appendChild(m), l.appendChild(g), l.appendChild(h), a.appendChild(l), o += u.totalCost
+        }), i.textContent = "$" + o.toLocaleString(), n.textContent = "$" + Math.round(o / e.reduce((u, l) => u + l.count, 0) || 0).toLocaleString()
+    }
+
+    function checkStorageCapacity(e, a) {
+        let i = document.getElementById("storage-warnings");
+        console.log("Storage warnings container:", i);
+        if (!i) {
+            console.error("Storage warnings container not found!");
+            return
+        }
+        if (!e || !e.steps || e.steps.length === 0 || !r.storages) {
+            console.log("Early return: no route or storages");
+            return
+        }
+        i.innerHTML = "";
+        let n = r.storages.filter(({
+                storage: C
+            }) => C.id === "faction" || C.id === "biz_train"),
+            s = {};
+        console.log("All storages:", r.storages.map(C => ({
+            id: C.storage.id,
+            name: C.storage.name,
+            capacity: C.storage.size
+        })));
+        console.log("Filtered storages for checking:", n.map(C => ({
+            id: C.storage.id,
+            name: C.storage.name,
+            capacity: C.storage.size,
+            items: C.items,
+            itemCount: C.items.length
+        })));
+        if (n.length === 0) return;
+        n.forEach(({
+            storage: C,
+            items: T
+        }) => {
+            console.log(`Processing ${C.name}:`, {
+                itemsCount: T.length,
+                firstItem: T[0],
+                itemKeys: T.map(N => N.item)
+            });
+            let I = 0;
+            T.forEach(N => {
+                let v = t[N.item];
+                console.log(`Item ${N.item}: amount=${N.amount}, weight=${v?.weight || 0}, total=${N.amount * (v?.weight || 0)}`);
+                I += N.amount * (v?.weight || 0)
+            });
+            console.log(`${C.name} current weight: ${I} kg`);
+            s[C.id] = {
+                name: C.name,
+                capacity: C.size,
+                currentUsed: I,
+                recipeNeeded: 0,
+                items: {},
+                currentItems: []
+            }
+        });
+        let o = C => {
+            let T = [];
+            if (!C.subSteps || C.subSteps.length === 0) {
+                if (C.solution && C.solution.type === L.Recipe) {
+                    let I = C.solution.recipe.ingredients || [];
+                    console.log(`Leaf recipe "${C.solution.recipe.name}": ${I.length} ingredients, ${C.solution.recipeAmount} times`);
+                    I.forEach(v => {
+                        console.log(`  - ${v.item.name}: ${v.amount} x ${C.solution.recipeAmount} = ${v.amount * C.solution.recipeAmount} (weight: ${v.item.weight} kg each)`);
+                        T.push({
+                            name: v.item.name,
+                            weight: v.item.weight,
+                            amount: v.amount * C.solution.recipeAmount
+                        })
+                    })
+                }
+            } else {
+                console.log(`Non-leaf step, processing ${C.subSteps.length} substeps`);
+                C.subSteps.forEach(I => {
+                    T.push(...o(I))
+                })
+            }
+            return T
+        };
+        console.log("Starting recipe analysis, steps:", e.steps.length);
+        let u = {};
+        e.steps.forEach(C => {
+            console.log("Processing step:", C);
+            let T = o(C);
+            T.forEach(I => {
+                u[I.name] || (u[I.name] = {
+                    weight: I.weight,
+                    amount: 0
+                }), u[I.name].amount += I.amount
+            })
+        });
+        console.log("Raw materials needed for recipe:", u);
+        let l = Object.values(u).reduce((C, T) => C + T.weight * T.amount, 0);
+        console.log("Total weight of raw materials needed:", l, "kg");
+        let m = 0;
+        Object.keys(s).forEach(C => {
+            let T = s[C];
+            T.items = Object.keys(u).reduce((I, v) => (I[v] = u[v].amount, I), {}), T.recipeNeeded = l, T.totalNeeded = T.currentUsed + l;
+            console.log(`${T.name}:`);
+            console.log(`  Current: ${T.currentUsed.toLocaleString()} kg`);
+            console.log(`  Recipe needs: ${T.recipeNeeded.toLocaleString()} kg`);
+            console.log(`  Total: ${T.totalNeeded.toLocaleString()} kg / ${T.capacity.toLocaleString()} kg`);
+            console.log(`  Will exceed? ${T.totalNeeded > T.capacity}`);
+            let I = Object.entries(T.items).sort((v, N) => N[1] - v[1]).slice(0, 5).map(v => `${v[0]}: ${v[1].toLocaleString()}`).join(", "),
+                v = document.createElement("div"),
+                N = document.createElement("div"),
+                P = document.createElement("div");
+            if (T.totalNeeded > T.capacity) {
+                m++, console.log(`Adding EXCEEDED warning for ${T.name}`), v.className = "storage-warning", N.className = "storage-warning-title", N.textContent = `⚠ ${T.name} Capacity Exceeded`, P.className = "storage-warning-details", P.innerHTML = `
+                <div><strong>Capacity:</strong> ${T.capacity.toLocaleString()} kg</div>
+                <div><strong>Current Usage:</strong> ${Math.round(T.currentUsed).toLocaleString()} kg</div>
+                <div><strong>Recipe Needs:</strong> ${Math.round(T.recipeNeeded).toLocaleString()} kg</div>
+                <div><strong>Total Needed:</strong> ${Math.round(T.totalNeeded).toLocaleString()} kg</div>
+                <div><strong>Overage:</strong> ${Math.round(T.totalNeeded-T.capacity).toLocaleString()} kg (${Math.round((T.totalNeeded-T.capacity)/T.capacity*100)}%)</div>
+                <div style="margin-top: 5px;"><strong>Top raw materials needed:</strong> ${I}</div>
+            `
+            } else console.log(`Adding OK status for ${T.name}`), v.className = "storage-warning", v.style.backgroundColor = "rgba(76, 175, 80, 0.2)", v.style.borderColor = "#4caf50", v.style.borderLeftColor = "#4caf50", N.className = "storage-warning-title", N.textContent = `✓ ${T.name} Capacity OK`, N.style.color = "#4caf50", P.className = "storage-warning-details", P.innerHTML = `
+                <div><strong>Capacity:</strong> ${T.capacity.toLocaleString()} kg</div>
+                <div><strong>Current Usage:</strong> ${Math.round(T.currentUsed).toLocaleString()} kg (${Math.round(T.currentUsed/T.capacity*100)}%)</div>
+                <div><strong>Recipe Needs:</strong> ${Math.round(T.recipeNeeded).toLocaleString()} kg</div>
+                <div><strong>Total Needed:</strong> ${Math.round(T.totalNeeded).toLocaleString()} kg (${Math.round(T.totalNeeded/T.capacity*100)}%)</div>
+                <div><strong>Available Space:</strong> ${Math.round(T.capacity-T.totalNeeded).toLocaleString()} kg</div>
+                <div style="margin-top: 5px;"><strong>Top raw materials needed:</strong> ${I}</div>
+            `;
+            v.appendChild(N), v.appendChild(P), i.appendChild(v), console.log("Storage status element added to DOM")
+        }), console.log(`Total storage panels added: ${Object.keys(s).length}, warnings: ${m}`), console.log("Storage container has content:", i.innerHTML.length > 0)
+    }
     async function Kt() {
         let e = document.getElementById("error"),
             a = document.querySelector(".graph-wrapper"),
@@ -13310,7 +13490,7 @@ ${d.stack}` : typeof d == "object" ? JSON.stringify(d) : String(d)).join(" ");
                 route: y.route,
                 resultingUserStorages: y.resultingUserStorages,
                 graph: C
-            }, document.getElementById("total-cost").textContent = "$" + S.info.totalCost.toLocaleString(), document.getElementById("total-runs").textContent = S.info.totalRuns.toLocaleString(), document.getElementById("total-revenue").textContent = "$" + S.info.totalRevenue.toLocaleString(), i.innerHTML = "", i.removeAttribute("data-processed"), ct(r.elk, C, i).then(() => {
+            }, document.getElementById("total-cost").textContent = "$" + S.info.totalCost.toLocaleString(), document.getElementById("total-runs").textContent = S.info.totalRuns.toLocaleString(), document.getElementById("total-revenue").textContent = "$" + S.info.totalRevenue.toLocaleString(), displayCostBreakdown(S.info.breakdown), checkStorageCapacity(y.route, S.info), i.innerHTML = "", i.removeAttribute("data-processed"), ct(r.elk, C, i).then(() => {
                 try {
                     if (zt(), r.scale = m, r.translateX = g, r.translateY = h, a.querySelector("svg")) {
                         if (a.style.opacity = "1", l.style.opacity = "0", i.style.visibility = "visible", !a.querySelector(`.node[data-id="${r.pinnedNodeId}"]`) && r.pinnedNodeId && (r.pinnedNodeId = null, r.pinnedNodePosition = null, localStorage.removeItem("pinnedNodeId")), K(), r.pinnedNodeId) {
@@ -13347,9 +13527,11 @@ ${d.stack}` : typeof d == "object" ? JSON.stringify(d) : String(d)).join(" ");
         }
     }
     async function qr() {
+        console.log("Refresh button clicked!");
         let e = localStorage.getItem("apiKey"),
             a = document.getElementById("userId").value,
             i = document.getElementById("error");
+        console.log("API Key:", e ? "present" : "missing", "User ID:", a);
         if (!e) {
             i.textContent = "Please enter and save an API key first";
             return
@@ -13363,18 +13545,34 @@ ${d.stack}` : typeof d == "object" ? JSON.stringify(d) : String(d)).join(" ");
             return
         }
         let s = localStorage.getItem("factionId");
+        console.log("Faction ID:", s);
         if (s == null) {
             i.textContent = "Please enter and save an API key first";
             return
         }
         try {
-            i.textContent = "", r.storages = await it(r.apiUrl, a, e, s === "-1" ? null : s), localStorage.setItem("storages", JSON.stringify(ae())), r.storagesUpdatedSinceLastRefresh = !0, await Kt()
+            console.log("Fetching storages from API...");
+            i.textContent = "", r.storages = await it(r.apiUrl, a, e, s === "-1" ? null : s);
+            console.log("Storages loaded:", r.storages.length);
+            localStorage.setItem("storages", JSON.stringify(ae())), r.storagesUpdatedSinceLastRefresh = !0;
+            console.log("Calling Kt() to recalculate...");
+            await Kt();
+            console.log("Refresh complete!");
         } catch (o) {
+            console.error("Refresh error:", o);
             i.textContent = `Error: ${o.message}`, console.error(o)
         }
     }
+    function Yr() {
+        console.log("Speed boost activated!");
+        window.parent.postMessage({
+            type: "speedBoost",
+            boost: 50
+        }, "*")
+    }
     window.saveApiKey = Jr;
     window.refresh = qr;
+    window.applySpeedBoost = Yr;
     document.addEventListener("DOMContentLoaded", function() {
         _t(), Wt(), Gt(), J(), b(), setTimeout(() => {
             window.parent.postMessage({

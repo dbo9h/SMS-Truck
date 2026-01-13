@@ -11,6 +11,9 @@
 		<div id="main">
 			<div class="user-input">
 				<div class="button-container">
+					<button class="speed-boost-button" onclick="applySpeedBoost()" title="Boost current vehicle speed by 50%">
+						⚡ Speed Boost
+					</button>
 					<button class="toggle-settings" onclick="toggleSettings()">☰</button>
 					<button class="storages-button" onclick="openStoragesUI()" title="View storage contents">
 						Storages
@@ -263,9 +266,30 @@
 							Route Info <span class="submenu-toggle">▼</span>
 						</div>
 						<div class="submenu-content">
-							<div>Total Cost: <span id="total-cost">$0</span></div>
-							<div>Total Runs: <span id="total-runs">0</span></div>
-							<div>Total Revenue: <span id="total-revenue">$0</span></div>
+							<div style="grid-column: span 2;">Total Cost: <span id="total-cost">$0</span></div>
+							<div style="grid-column: span 2;">Total Runs: <span id="total-runs">0</span></div>
+							<div style="grid-column: span 2;">Total Revenue: <span id="total-revenue">$0</span></div>
+							<div id="storage-warnings" class="storage-warnings"></div>
+							<div id="cost-breakdown-container" class="cost-breakdown-container">
+								<table id="cost-breakdown-table" class="cost-breakdown-table">
+									<thead>
+										<tr>
+											<th>Operation</th>
+											<th>Total Cost</th>
+											<th>For 1</th>
+										</tr>
+									</thead>
+									<tbody id="cost-breakdown-body">
+									</tbody>
+									<tfoot>
+										<tr class="total-row">
+											<td>Total</td>
+											<td id="breakdown-total-cost">$0</td>
+											<td id="breakdown-per-unit-cost">$0</td>
+										</tr>
+									</tfoot>
+								</table>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -420,6 +444,6 @@
 		</div>
 
 	<script src="https://cdn.jsdelivr.net/npm/elkjs@0.8.2/lib/elk.bundled.js"></script>
-	<script src="index.js"></script>
+	<script src="index.js?v=10"></script>
 	</body>
 </html>
