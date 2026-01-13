@@ -10345,10 +10345,21 @@
                     let p = JSON.parse(h.data);
                     if (p.size) {
                         let f = m.find(d => d.storage.id === "faction");
-                        f && (console.log(`Updating Faction Storage capacity from ${f.storage.size} to ${p.size}`), f.storage = {
+                        if (f) console.log(`Updating Faction Storage capacity from ${f.storage.size} to ${p.size}`), f.storage = {
                             ...f.storage,
                             size: p.size
-                        })
+                        };
+                        else {
+                            console.warn(`Faction Storage not found in API storages! Creating it with capacity ${p.size} kg.`);
+                            let d = _e;
+                            m.push({
+                                storage: {
+                                    ...d,
+                                    size: p.size
+                                },
+                                items: []
+                            }), console.log(`Created Faction Storage with capacity ${p.size} kg`)
+                        }
                     }
                 } catch (p) {
                     console.warn("Failed to parse faction storage size:", p)
@@ -10362,19 +10373,35 @@
             console.log("User businesses response:", g);
             if (Array.isArray(g)) {
                 let h = g.filter(p => p === "biz_train" || p.includes("train")).length;
-                console.log(`User has ${h} train stations`);
+                console.log(`User has ${h} train stations from businesses`);
                 if (h > 0) {
                     let p = m.find(f => f.storage.id === "biz_train"),
                         f = 51785 * h;
-                    p && (console.log(`Updating Train Network capacity from ${p.storage.size} to ${f} (${h} stations x 51,785 kg)`), p.storage = {
+                    if (p) console.log(`Updating Train Network capacity from ${p.storage.size} to ${f} (${h} stations x 51,785 kg)`), p.storage = {
                         ...p.storage,
                         size: f
-                    })
+                    };
+                    else {
+                        console.warn(`Train Network storage not found in API storages! Creating it with ${h} stations.`);
+                        let d = qt.biz_train;
+                        m.push({
+                            storage: {
+                                ...d,
+                                size: f
+                            },
+                            items: []
+                        }), console.log(`Created Train Network storage with capacity ${f} kg (${h} stations x 51,785 kg)`)
+                    }
                 }
             }
         } catch (g) {
             console.warn("Failed to fetch user businesses:", g)
         }
+        console.log("Final storages after capacity updates:", m.map(g => ({
+            id: g.storage.id,
+            name: g.storage.name,
+            capacity: g.storage.size
+        })));
         return m.push(await s), m.push(await o), m.push(...await u), m.sort(({
             storage: g
         }, {
@@ -13432,33 +13459,39 @@ ${d.stack}` : typeof d == "object" ? JSON.stringify(d) : String(d)).join(" ");
         let l = Object.values(u).reduce((C, T) => C + T.weight * T.amount, 0);
         console.log("Total weight of raw materials needed:", l, "kg");
         let m = 0;
+        console.log(`=== Checking ${Object.keys(s).length} storages ===`);
         Object.keys(s).forEach(C => {
             let T = s[C];
+            console.log(`\n--- ${T.name} (ID: ${C}) ---`);
             T.items = Object.keys(u).reduce((I, v) => (I[v] = u[v].amount, I), {}), T.recipeNeeded = l, T.totalNeeded = T.currentUsed + l;
-            console.log(`${T.name}:`);
             console.log(`  Current: ${T.currentUsed.toLocaleString()} kg`);
             console.log(`  Recipe needs: ${T.recipeNeeded.toLocaleString()} kg`);
             console.log(`  Total: ${T.totalNeeded.toLocaleString()} kg / ${T.capacity.toLocaleString()} kg`);
-            console.log(`  Will exceed? ${T.totalNeeded > T.capacity}`);
-            if (T.totalNeeded > T.capacity) {
-                m++;
-                console.log(`Adding warning for ${T.name}`);
-                let I = Object.entries(T.items).sort((v, N) => N[1] - v[1]).slice(0, 5).map(v => `${v[0]}: ${v[1].toLocaleString()}`).join(", "),
-                    v = document.createElement("div");
-                v.className = "storage-warning";
-                let N = document.createElement("div");
-                N.className = "storage-warning-title", N.textContent = `⚠ ${T.name} Capacity Exceeded`;
-                let P = document.createElement("div");
-                P.className = "storage-warning-details", P.innerHTML = `
+            console.log(`  Exceeds? ${T.totalNeeded > T.capacity}`);
+            let I = Object.entries(T.items).sort((v, N) => N[1] - v[1]).slice(0, 5).map(v => `${v[0]}: ${v[1].toLocaleString()}`).join(", "),
+                v = document.createElement("div");
+            v.className = "storage-warning";
+            let N = document.createElement("div");
+            N.className = "storage-warning-title";
+            let P = document.createElement("div");
+            if (P.className = "storage-warning-details", T.totalNeeded > T.capacity) {
+                m++, console.log(`  ✅ Creating EXCEEDED warning for ${T.name}`), N.textContent = `⚠ ${T.name} Capacity Exceeded`, P.innerHTML = `
                 <div><strong>Capacity:</strong> ${T.capacity.toLocaleString()} kg</div>
                 <div><strong>Current Usage:</strong> ${Math.round(T.currentUsed).toLocaleString()} kg</div>
                 <div><strong>Recipe Needs:</strong> ${Math.round(T.recipeNeeded).toLocaleString()} kg</div>
                 <div><strong>Total Needed:</strong> ${Math.round(T.totalNeeded).toLocaleString()} kg</div>
                 <div><strong>Overage:</strong> ${Math.round(T.totalNeeded-T.capacity).toLocaleString()} kg (${Math.round((T.totalNeeded-T.capacity)/T.capacity*100)}%)</div>
                 <div style="margin-top: 5px;"><strong>Top raw materials needed:</strong> ${I}</div>
-            `, v.appendChild(N), v.appendChild(P), i.appendChild(v), console.log("Warning element added to DOM:", v)
-            }
-        }), console.log(`Total warnings added: ${m}`), console.log("Storage warnings container HTML:", i.innerHTML.substring(0, 200))
+            `
+            } else console.log(`  ℹ️ Creating OK status for ${T.name}`), v.style.background = "rgba(40, 167, 69, 0.15)", v.style.borderColor = "#28a745", N.textContent = `✓ ${T.name} - Capacity OK`, N.style.color = "#28a745", P.innerHTML = `
+                <div><strong>Capacity:</strong> ${T.capacity.toLocaleString()} kg</div>
+                <div><strong>Current:</strong> ${Math.round(T.currentUsed).toLocaleString()} kg (${Math.round(T.currentUsed/T.capacity*100)}%)</div>
+                <div><strong>Recipe Needs:</strong> ${Math.round(T.recipeNeeded).toLocaleString()} kg</div>
+                <div><strong>Total:</strong> ${Math.round(T.totalNeeded).toLocaleString()} kg (${Math.round(T.totalNeeded/T.capacity*100)}%)</div>
+                <div><strong>Available:</strong> ${Math.round(T.capacity-T.totalNeeded).toLocaleString()} kg</div>
+            `;
+            v.appendChild(N), v.appendChild(P), i.appendChild(v), console.log(`  ✅ Appended to DOM`)
+        }), console.log(`\n=== Summary: ${m} warnings, ${Object.keys(s).length} total panels ===`)
     }
     async function Kt() {
         let e = document.getElementById("error"),
