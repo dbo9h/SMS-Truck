@@ -11130,6 +11130,26 @@ ${d.stack}` : typeof d == "object" ? JSON.stringify(d) : String(d)).join(" ");
         r.logs.length = 0
     }
 
+    function nr() {
+        let e = document.querySelector(".console-content");
+        if (!e) return console.warn("Console content not found"), void 0;
+        let a = Array.from(e.children).map(i => i.textContent).join("\n");
+        if (!a) return console.warn("Console is empty"), void 0;
+        navigator.clipboard.writeText(a).then(() => {
+            console.info("✓ Console copied to clipboard!")
+        }).catch(i => {
+            console.error("Failed to copy to clipboard:", i);
+            let n = document.createElement("textarea");
+            n.value = a, n.style.position = "fixed", n.style.top = "0", n.style.left = "0", n.style.opacity = "0", document.body.appendChild(n), n.select(), n.setSelectionRange(0, 99999);
+            try {
+                document.execCommand("copy"), console.info("✓ Console copied to clipboard (fallback method)!")
+            } catch (s) {
+                console.error("Fallback copy also failed:", s)
+            }
+            document.body.removeChild(n)
+        })
+    }
+
     function mt() {
         let e = document.getElementById("console-code-input"),
             a = e.value.trim();
@@ -11160,6 +11180,7 @@ ${d.stack}` : typeof d == "object" ? JSON.stringify(d) : String(d)).join(" ");
     }
     window.toggleConsole = ar;
     window.clearConsole = rr;
+    window.copyConsoleToClipboard = nr;
     window.executeConsoleCode = mt;
     tr();
 

@@ -324,10 +324,11 @@
 						<button class="console-filter" data-type="warn">Warn</button>
 						<button class="console-filter" data-type="error">Error</button>
 					</div>
+					<button class="console-copy" onclick="copyConsoleToClipboard()" title="Copy all console text to clipboard">Copy</button>
 					<button class="console-clear" onclick="clearConsole()">Clear</button>
 					<button class="console-close" onclick="toggleConsole()">×</button>
 				</div>
-				<div class="console-content"></div>
+				<div class="console-content" style="user-select: text; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text;"></div>
 				<div class="console-input-container">
 					<textarea id="console-code-input" placeholder="Enter code to execute..."></textarea>
 					<button id="console-execute-btn" onclick="executeConsoleCode()">Execute</button>
@@ -441,6 +442,6 @@
 		</div>
 
 	<script src="https://cdn.jsdelivr.net/npm/elkjs@0.8.2/lib/elk.bundled.js"></script>
-	<script src="index.js?v=13"></script>
+	<script src="index.js?v=14"></script>
 	</body>
 </html>
