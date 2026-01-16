@@ -1,447 +1,925 @@
 
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<title>Doggo's Trucking Calculator</title>
-		<link rel="stylesheet" href="styles.css" />
-	</head>
-	<body>
-		<div id="main">
-			<div class="user-input">
-				<div class="button-container">
-					<button class="toggle-settings" onclick="toggleSettings()">☰</button>
-					<button class="storages-button" onclick="openStoragesUI()" title="View storage contents">
-						Storages
-					</button>
-					<button class="transfers-button" onclick="openTransfersUI()" title="View transfer history">
-						Transfers
-					</button>
-					<button class="refresh-button" onclick="refresh()" title="Uses 3 API charges per refresh">
-						Refresh
-					</button>
-				</div>
-				<div class="collapsible">
-					<!-- User Settings Submenu -->
-					<div class="submenu">
-						<div class="submenu-header" onclick="toggleSubmenu(this)">
-							User Settings <span class="submenu-toggle">▼</span>
-						</div>
-						<div class="submenu-content">
-							<label for="apiKey">API Key:</label>
-							<input type="password" id="apiKey" placeholder="Enter API Key" />
-							<label for="userId">User ID:</label>
-							<input type="number" id="userId" placeholder="Enter User ID" />
-							<label for="alternativeApi" title="Use the alternative api">Alternative API:</label>
-							<input type="checkbox" title="Adds 15% to storage capacity" id="alternativeApi" checked />
-							<label for="premium" title="Adds 15% to storage capacity">Premium:</label>
-							<input type="checkbox" title="Adds 15% to storage capacity" id="premium" checked />
-							<label for="farmersMilk" title="Adds 20% to storage capacity">Farmer's Milk:</label>
-							<input type="checkbox" title="Adds 20% to storage capacity" id="farmersMilk" />
-							<label for="perk" title="Select active perk">Perk:</label>
-							<select id="perk" title="Select active perk">
-								<option value="none">None</option>
-								<option value="postop">PostOP</option>
-								<option value="strength">Strength</option>
-							</select>
-							<div
-								style="
-									grid-column: span 2;
-									display: flex;
-									justify-content: space-around;
-									margin-top: 5px;
-								"
-							>
-								<button id="clearAllData" class="danger-button" onclick="clearAllData()">
-									Clear All Data
-								</button>
-								<button onclick="saveApiKey()">Save API Key</button>
-							</div>
-						</div>
-					</div>
+<head>
+    <meta charset="UTF-8">
+    <title>TT Cargo Pilot Helper</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Roboto:wght@400;700&display=swap');
 
-					<!-- Trucking Settings Submenu -->
-					<div class="submenu">
-						<div class="submenu-header" onclick="toggleSubmenu(this)">
-							Trucking Settings <span class="submenu-toggle">▼</span>
-						</div>
-						<div class="submenu-content">
-							<label for="mk15">MK15:</label>
-							<input type="checkbox" id="mk15" value="mk15" checked />
-							<label for="trailer">Trailers:</label>
-							<select id="trailer"></select>
-							<label for="useOptimalLoading" title="Use optimal processing loading"
-								>Use optimal processing loading:</label
-							>
-							<input
-								type="checkbox"
-								title="Use optimal processing loading"
-								id="useOptimalLoading"
-								checked
-							/>
-							<label for="useItems" title="Use items from storages">Use items from storages:</label>
-							<input type="checkbox" title="Use items from storages" id="useItems" checked />
-							<label for="useInventory" title="Use the player inventory">Use inventory:</label>
-							<input type="checkbox" title="Use the player inventory" id="useInventory" checked />
-							<label for="autoRefresh">Auto-refresh:</label>
-							<input type="checkbox" id="autoRefresh" />
-							<label for="autoOpenTrunk">Automatically open trunk(s):</label>
-							<input type="checkbox" id="autoOpenTrunk" />
-							<label for="autoCloseTrunk">Automatically close trunk(s):</label>
-							<input type="checkbox" id="autoCloseTrunk" />
-							<label for="autoRecipe">Automatically select recipe:</label>
-							<input type="checkbox" id="autoRecipe" />
-							<label for="useHighestMultiplier">Use highest multipliers:</label>
-							<input type="checkbox" id="useHighestMultiplier" />
-						</div>
-					</div>
+        :root {
+            --primary: #0277bd;
+            --primary-dim: #004c8c;
+            --bg-glass: rgba(15, 15, 15, 0.95);
+            --text-main: #ffffff;
+            --text-dim: #aaaaaa;
+            --border: 1px solid rgba(2, 119, 189, 0.3);
+            --green: #00e676;
+            --orange: #ff9800;
+            --accent: #ffc107;
+        }
 
-					<!-- Recipe Settings Submenu -->
-					<div class="submenu">
-						<div class="submenu-header" onclick="toggleSubmenu(this)">
-							Recipe Settings <span class="submenu-toggle">▼</span>
-						</div>
-						<div class="submenu-content">
-							<!-- Multi-item selection -->
-							<div class="items-selection-container" style="grid-column: span 2">
-								<div class="items-list" id="selected-items-list">
-									<!-- Selected items will appear here -->
-								</div>
-								<div class="item-add-container">
-									<div class="item-add-row">
-										<select id="itemType" class="item-dropdown"></select>
-										<input
-											type="number"
-											id="amount"
-											placeholder="Amount"
-											value="1000"
-											class="item-amount-input"
-										/>
-										<button onclick="addItem()" class="add-item-btn">Add</button>
-									</div>
-								</div>
-							</div>
-							<div
-								style="grid-column: span 2; display: flex; justify-content: right; margin-top: -5px"
-								class="recipe-settings-container"
-							>
-								<button onclick="openRecipeSettings()" title="Customize recipe priorities">
-									Recipe Settings
-								</button>
-							</div>
-						</div>
-					</div>
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Roboto', sans-serif;
+            background-color: transparent;
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh; width: 100vw;
+            user-select: none;
+        }
 
-					<!-- Appearance Submenu -->
-					<div class="submenu">
-						<div class="submenu-header" onclick="toggleSubmenu(this)">
-							Appearance Settings <span class="submenu-toggle">▼</span>
-						</div>
-						<div class="submenu-content">
-							<label for="showPinPanel" title="Display pin panel">Show Pin Panel:</label>
-							<input type="checkbox" title="Display pin panel" id="showPinPanel" />
-							<label for="windowedMode" title="Display graph in a resizable window">Windowed mode:</label>
-							<input type="checkbox" title="Display graph in a resizable window" id="windowedMode" />
-							<label for="hideGridLines">Hide Grid Lines:</label>
-							<input type="checkbox" id="hideGridLines" />
-							<label for="nodeOpacity">Node Opacity:</label>
-							<input type="range" id="nodeOpacity" min="0.1" max="1" step="0.1" value="1" />
-							<label for="bgOpacity">Background Opacity:</label>
-							<input type="range" id="bgOpacity" min="0" max="1" step="0.1" value="1" />
-							<div
-								style="
-									grid-column: span 2;
-									display: flex;
-									justify-content: space-between;
-									margin-top: 10px;
-								"
-							>
-								<button onclick="resetWindowPosition()" title="Reset the window position and size">
-									Reset Window
-								</button>
-								<button onclick="resetPinPanelPosition()" title="Reset the pin panel position and size">
-									Reset Pin Panel
-								</button>
-							</div>
-							<div id="console-button-container" class="console-button-container">
-								<button onclick="reloadApp()" title="Reload the application">Reload App</button>
-								<button onclick="toggleConsole()" title="Show/hide the console for debugging">
-									Toggle Console
-								</button>
-							</div>
-						</div>
-					</div>
+        #tracker-app {
+            position: absolute;
+            top: 20px; left: 50%;
+            transform: translateX(-50%);
+            width: 96vw;
+            max-width: 1800px;
+            height: 140px;
+            background: var(--bg-glass);
+            border: var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            display: flex; flex-direction: column;
+            resize: both; overflow: hidden;
+            min-height: 140px;
+            transition: width 0.2s ease, height 0.2s ease;
+        }
 
-					<!-- NUI Settings Submenu -->
-					<div class="submenu">
-						<div class="submenu-header" onclick="toggleSubmenu(this)">
-							NUI Settings <span class="submenu-toggle">▼</span>
-						</div>
-						<div class="submenu-content">
-							<label for="truckingItemToTake" title="Item to take when executing take"
-								>Take command item:</label
-							>
-							<select id="truckingItemToTake" title="Item to take when executing take"></select>
-							<label for="takeMax" title="Take maximum amount of items for recipes">Take Max:</label>
-							<input type="checkbox" id="takeMax" title="Take maximum amount of items for recipes" />
-							<label for="dumpBeforeExecuting" title="Dump all items before executing recipe"
-								>Dump Before Executing:</label
-							>
-							<input
-								type="checkbox"
-								id="dumpBeforeExecuting"
-								title="Dump all items before executing recipe"
-								checked
-							/>
+        /* --- MINI MODE --- */
+        #tracker-app.mini-mode {
+            width: 420px !important;
+            height: 74px !important;
+            min-height: 74px !important;
+            border-radius: 12px;
+            background: rgba(10, 10, 10, 0.98);
+            border: 1px solid var(--primary);
+            resize: none;
+        }
 
-							<div class="nui-buttons">
-								<button onclick="nuiDump()">Dump</button>
-								<button onclick="nuiTake()">Take</button>
-								<button onclick="nuiExecute()">Recipe</button>
-								<button onclick="nuiCustom()">Custom</button>
-							</div>
-						</div>
-					</div>
+        #tracker-app.mini-mode header, 
+        #tracker-app.mini-mode #sky-container,
+        #tracker-app.mini-mode #content { display: none !important; }
 
-					<!-- Custom Recipe Submenu -->
-					<div class="submenu">
-						<div class="submenu-header" onclick="toggleSubmenu(this)">
-							Custom Recipe Creator <span class="submenu-toggle">▼</span>
-						</div>
-						<div class="submenu-content">
-							<label title="Ingredients list">Ingredients</label>
-							<div class="items-selection-container" style="grid-column: span 2">
-								<div class="items-list" id="custom-recipe-ingredients-list">
-									<!-- Selected items will appear here -->
-								</div>
-								<div class="item-add-container">
-									<div class="item-add-row">
-										<select id="custom-recipe-ingredient-type" class="item-dropdown"></select>
-										<input
-											type="number"
-											id="custom-recipe-ingredient-amount"
-											placeholder="Ratio"
-											value="3"
-											class="item-amount-input"
-										/>
-										<button onclick="addCustomRecipeIngredient()" class="add-item-btn">Add</button>
-									</div>
-								</div>
-							</div>
-							<label title="Products list">Products</label>
-							<div class="items-selection-container" style="grid-column: span 2">
-								<div class="items-list" id="custom-recipe-products-list">
-									<!-- Selected items will appear here -->
-								</div>
-								<div class="item-add-container">
-									<div class="item-add-row">
-										<select id="custom-recipe-product-type" class="item-dropdown"></select>
-										<input
-											type="number"
-											id="custom-recipe-product-amount"
-											placeholder="Ratio"
-											value="1"
-											class="item-amount-input"
-										/>
-										<button onclick="addCustomRecipeProduct()" class="add-item-btn">Add</button>
-									</div>
-								</div>
-							</div>
-							<div
-								style="grid-column: span 2; display: flex; justify-content: right; margin-top: -5px"
-								class="recipe-settings-container"
-							>
-								<button onclick="createCustomRecipe()">Save as Recipe</button>
-							</div>
-						</div>
-					</div>
+        #micro-view {
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+            padding: 0 12px;
+            font-family: 'Rajdhani', sans-serif;
+            cursor: move;
+        }
+        #tracker-app.mini-mode #micro-view { display: flex; }
 
-					<!-- Route Info Submenu -->
-					<div class="submenu">
-						<div class="submenu-header" onclick="toggleSubmenu(this)">
-							Route Info <span class="submenu-toggle">▼</span>
-						</div>
-						<div class="submenu-content">
-							<div style="grid-column: span 2;">Total Cost: <span id="total-cost">$0</span></div>
-							<div style="grid-column: span 2;">Total Runs: <span id="total-runs">0</span></div>
-							<div style="grid-column: span 2;">Total Revenue: <span id="total-revenue">$0</span></div>
-							<div id="storage-warnings" class="storage-warnings"></div>
-							<div id="cost-breakdown-container" class="cost-breakdown-container">
-								<table id="cost-breakdown-table" class="cost-breakdown-table">
-									<thead>
-										<tr>
-											<th>Operation</th>
-											<th>Total Cost</th>
-											<th>For 1</th>
-										</tr>
-									</thead>
-									<tbody id="cost-breakdown-body">
-									</tbody>
-									<tfoot>
-										<tr class="total-row">
-											<td>Total</td>
-											<td id="breakdown-total-cost">$0</td>
-											<td id="breakdown-per-unit-cost">$0</td>
-										</tr>
-									</tfoot>
-								</table>
-							</div>
-						</div>
-					</div>
-				</div>
-				<div id="error" class="error"></div>
-			</div>
-			<div class="graph-container">
-				<div class="window-header">
-					<div class="window-title">Doggo's Trucking Calculator</div>
-				</div>
-				<div class="resize-handle">
-					<div class="resize-handle-icon"></div>
-				</div>
-				<div class="graph-wrapper">
-					<div class="elk-graph"></div>
-				</div>
-			</div>
-			<div id="pin-panel" class="pin-panel hidden">
-				<div class="panel-header">
-					<div class="panel-title">Pinned Recipe</div>
-				</div>
-				<div class="panel-content">
-					<div id="pinned-recipe">
-						<p>No recipe pinned.</p>
-					</div>
-				</div>
-				<div class="resize-handle"></div>
-			</div>
-			<div id="console-container" class="console-container hidden">
-				<div class="console-header">
-					<div class="console-title">Console</div>
-					<div class="console-filters">
-						<button class="console-filter active" data-type="all">All</button>
-						<button class="console-filter" data-type="log">Log</button>
-						<button class="console-filter" data-type="info">Info</button>
-						<button class="console-filter" data-type="warn">Warn</button>
-						<button class="console-filter" data-type="error">Error</button>
-					</div>
-					<button class="console-copy" onclick="copyConsoleToClipboard()" title="Copy all console text to clipboard">Copy</button>
-					<button class="console-clear" onclick="clearConsole()">Clear</button>
-					<button class="console-close" onclick="toggleConsole()">×</button>
-				</div>
-				<div class="console-content" style="user-select: text; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text;"></div>
-				<div class="console-input-container">
-					<textarea id="console-code-input" placeholder="Enter code to execute..."></textarea>
-					<button id="console-execute-btn" onclick="executeConsoleCode()">Execute</button>
-				</div>
-			</div>
-		</div>
+        .micro-row { display: flex; justify-content: space-between; align-items: center; width: 100%; height: 50%; }
+        .micro-group { display: flex; align-items: center; gap: 8px; }
+        .micro-sep { width: 1px; height: 12px; background: rgba(255,255,255,0.2); }
+        .micro-label { color: var(--text-dim); font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px; }
+        .micro-val { color: #fff; font-weight: 700; font-size: 0.9em; }
+        .micro-val.highlight { color: var(--primary); }
+        .micro-val.active { color: var(--green); }
+        
+        .micro-progress-bg { width: 60px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin: 0 5px; }
+        .micro-progress-fill { height: 100%; background: var(--primary); width: 0%; }
 
-		<!-- Recipe Settings Modal -->
-		<div id="recipe-settings-modal" class="modal hidden">
-			<div class="modal-content">
-				<div class="modal-header">
-					<h2>Recipe Settings</h2>
-					<button class="modal-close" onclick="closeRecipeSettings()">×</button>
-				</div>
-				<div class="modal-body">
-					<div class="recipe-search">
-						<input
-							type="text"
-							id="recipe-search"
-							placeholder="Search recipes..."
-							oninput="filterRecipes()"
-						/>
-						<button class="reset-priorities" onclick="resetPriorities()">Reset All to Default</button>
-					</div>
-					<div id="recipe-list" class="recipe-list"></div>
-				</div>
-				<div class="modal-footer">
-					<button onclick="saveRecipeSettings()">Close</button>
-				</div>
-			</div>
-		</div>
+        .micro-btn {
+            position: absolute; top: 4px; right: 4px;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: #aaa; padding: 0px 4px; border-radius: 3px; font-size: 0.6em; cursor: pointer;
+        }
+        .micro-btn:hover { background: var(--primary); color: white; }
 
-		<!-- Storage UI Modal -->
-		<div id="storage-ui-modal" class="modal hidden">
-			<div class="modal-content">
-				<div class="modal-header">
-					<h2>Storage Contents</h2>
-					<button class="modal-close" onclick="closeStoragesUI()">×</button>
-				</div>
-				<div class="modal-body">
-					<div class="storage-search">
-						<input
-							type="text"
-							id="storage-search"
-							placeholder="Search items..."
-							oninput="filterStorageItems()"
-						/>
-						<div class="storage-filter-container">
-							<button
-								id="reset-all-storage-priorities"
-								class="reset-priorities"
-								title="Reset all storage priorities to default values"
-								onclick="resetAllStoragePriorities()"
-							>
-								Reset All Priorities
-							</button>
-							<label for="trucking-items-only">
-								<input type="checkbox" id="trucking-items-only" onchange="filterStorageItems()" />
-								Trucking only
-							</label>
-						</div>
-					</div>
-					<table id="storage-list" class="storage-list">
-						<tbody>
-							<!-- Rows will be dynamically populated -->
-						</tbody>
-					</table>
-				</div>
-				<div class="modal-footer">
-					<button onclick="closeStoragesUI()">Close</button>
-				</div>
-			</div>
-		</div>
+        /* --- HEADER & ANIMATION --- */
+        header {
+            background: linear-gradient(180deg, var(--primary-dim), rgba(2, 119, 189, 0.2));
+            height: 40px;
+            padding: 0 10px;
+            cursor: move;
+            position: relative;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            overflow: hidden;
+        }
 
-		<!-- Transfers UI Modal -->
-		<div id="transfers-ui-modal" class="modal hidden">
-			<div class="modal-content">
-				<div class="modal-header">
-					<h2>Transfer History</h2>
-					<button class="modal-close" onclick="closeTransfersUI()">×</button>
-				</div>
-				<div class="modal-body">
-					<div class="transfer-search">
-						<input
-							type="text"
-							id="transfer-search"
-							placeholder="Search transfers..."
-							oninput="filterTransfers()"
-						/>
-						<select id="transfer-type-filter" onchange="filterTransfers()">
-							<option value="all">All Transfers</option>
-							<option value="in">Incoming</option>
-							<option value="out">Outgoing</option>
-						</select>
-						<button
-							class="danger-button"
-							title="Clear all transfer history"
-							onclick="clearTransferLogs(); filterTransfers();"
-						>
-							Clear History
-						</button>
-					</div>
-					<div id="transfers-list" class="transfers-list">
-						<!-- Transfers will be dynamically populated -->
-					</div>
-				</div>
-				<div class="modal-footer">
-					<button onclick="closeTransfersUI()">Close</button>
-				</div>
-			</div>
-		</div>
+        .header-title {
+            position: absolute; left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Rajdhani', sans-serif; 
+            font-weight: 900; font-size: 1em;
+            text-transform: uppercase; letter-spacing: 2px;
+            color: #fff; pointer-events: none; white-space: nowrap;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
 
-	<script src="https://cdn.jsdelivr.net/npm/elkjs@0.8.2/lib/elk.bundled.js"></script>
-	<script src="index.js?v=14"></script>
-	</body>
+        /* ANIMATION CONTAINER */
+        #sky-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 5;
+            display: none;
+        }
+
+        /* PARACHUTE & CRATE GROUP */
+        .drop-group {
+            position: absolute;
+            top: -90px; /* Start higher up due to larger size */
+            display: flex; flex-direction: column; align-items: center;
+            opacity: 0.8;
+        }
+
+        .parachute {
+            font-size: 2.2em; /* Increased size further */
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+            z-index: 6;
+        }
+
+        .crate {
+            font-size: 1.8em; /* Increased size further */
+            margin-top: -5px; /* Connect visually */
+            animation: crateWiggle 2s ease-in-out infinite alternate;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+            transform-origin: top center; /* Swing from top */
+        }
+
+        /* ANIMATIONS */
+        @keyframes dropFall {
+            0% { top: -90px; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 110px; opacity: 0; } /* Fall past bottom */
+        }
+
+        @keyframes crateWiggle {
+            from { transform: rotate(-15deg); }
+            to { transform: rotate(15deg); }
+        }
+
+        /* 5 UNIQUE DROPS */
+        .drop-1 { left: 10%; animation: dropFall 8s linear infinite; transform: scale(0.8); }
+        .drop-2 { left: 30%; animation: dropFall 6s linear infinite 2s; transform: scale(1); }
+        .drop-3 { left: 50%; animation: dropFall 9s linear infinite 1s; transform: scale(0.7); }
+        .drop-4 { left: 70%; animation: dropFall 7s linear infinite 4s; transform: scale(0.9); }
+        .drop-5 { left: 90%; animation: dropFall 10s linear infinite 0.5s; transform: scale(0.6); }
+
+
+        .header-controls { display: flex; gap: 6px; z-index: 20; align-items: center; }
+        .nav-icon { text-decoration: none; font-size: 1em; cursor: pointer; color: #ccc; }
+        .nav-icon:hover { color: #fff; }
+        
+        #mini-btn { font-family: 'Rajdhani', sans-serif; font-weight: bold; font-size: 0.7em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: #ccc; padding: 2px 5px; border-radius: 4px; cursor: pointer; }
+        #mini-btn:hover { background: var(--primary); color: white; border-color: var(--accent); }
+        
+        #clock { font-family: 'Rajdhani', sans-serif; font-weight: 700; color: #fff; font-size: 0.75em; z-index: 20; }
+
+        /* --- CONTENT --- */
+        #content { padding: 8px 12px; flex: 1; overflow-y: hidden; overflow-x: auto; scrollbar-width: thin; display: flex; flex-direction: row; gap: 12px; align-items: stretch; }
+
+        .destination-display { background: rgba(255, 193, 7, 0.1); border: 1px dashed var(--accent); border-radius: 6px; padding: 8px 15px; text-align: center; transition: all 0.3s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 200px; flex-shrink: 0; }
+        .dest-label { font-size: 0.65em; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+        .dest-value { font-family: 'Rajdhani', sans-serif; font-size: 1.1em; font-weight: 700; color: #fff; text-shadow: 0 0 10px rgba(0,0,0,0.5); white-space: nowrap; }
+        
+        .multi-warning { display: none; font-size: 0.65em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; animation: warnPulse 1s infinite alternate; }
+        @keyframes warnPulse { from { color: white; text-shadow: 0 0 2px black; } to { color: #ff3333; text-shadow: 0 0 10px red; } }
+
+        .horizontal-row { display: flex; gap: 12px; align-items: center; flex-wrap: nowrap; flex: 1; padding: 0 10px; }
+        .stat-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: fit-content; }
+        .stat-separator { width: 1px; height: 40px; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+
+        .label { font-size: 0.65em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 2px; white-space: nowrap; }
+        .value { font-size: 1em; font-weight: bold; color: var(--text-main); white-space: nowrap; }
+        .value.highlight { color: var(--primary); }
+        .value.bxp { color: var(--green); }
+
+        .progress-container { position: relative; height: 14px; background: rgba(0,0,0,0.5); border-radius: 4px; margin: 0; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
+        .progress-bar { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s ease; }
+        .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.65em; text-shadow: 1px 1px 2px black; font-weight: bold; z-index: 2; }
+
+
+
+        .sync-dot { height: 6px; width: 6px; border-radius: 50%; display: inline-block; background: #444; margin-left: 4px; vertical-align: middle; }
+        .sync-dot.live { background: var(--green); box-shadow: 0 0 5px var(--green); }
+        .sync-dot.cached { background: var(--orange); }
+
+        input[type="number"] { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid #444; color: white; padding: 3px 5px; border-radius: 3px; font-family: inherit; font-size: 0.8em; }
+        input:focus { outline: 1px solid var(--primary); border-color: var(--primary); }
+        
+        .quick-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #ccc; font-size: 0.65em; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-family: 'Rajdhani', sans-serif; font-weight: bold; white-space: nowrap; }
+        .quick-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+
+        #job-list, #summary-table { display: none !important; }
+        
+        #settings-panel { 
+            display: none; 
+            position: absolute; 
+            top: 50px; 
+            right: 10px; 
+            background: var(--bg-glass); 
+            border: var(--border); 
+            border-radius: 8px; 
+            padding: 15px; 
+            min-width: 250px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8); 
+            z-index: 1000; 
+        }
+        #settings-panel.show { display: block; }
+        .settings-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .settings-row:last-child { border-bottom: none; margin-bottom: 0; }
+        .settings-label { font-size: 0.85em; color: var(--text-dim); }
+        .settings-control { display: flex; gap: 5px; align-items: center; }
+        .font-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #ccc; padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8em; }
+        .font-btn:hover { background: var(--primary); color: white; }
+        .font-value { color: var(--primary); font-weight: bold; min-width: 35px; text-align: center; }
+        .settings-icon { cursor: pointer; font-size: 1em; color: #ccc; }
+        .settings-icon:hover { color: #fff; }
+    </style>
+</head>
+<body>
+
+<div id="tracker-app">
+    <div id="micro-view" onmousedown="dragMouseDown(event)">
+        <button class="micro-btn" onclick="toggleMini()">EXPAND</button>
+        
+        <div class="micro-row" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <div class="micro-group">
+                <span style="font-size:1.2em">📦</span>
+                <span class="micro-val highlight">ZG OPS</span>
+            </div>
+            <div class="micro-group">
+                <span class="micro-label">Dest:</span>
+                <span class="micro-val" id="micro-dest" style="max-width:140px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">--</span>
+            </div>
+            <div class="micro-group">
+                <span class="micro-label">Load:</span>
+                <span class="micro-val active" id="micro-weight">0kg</span>
+            </div>
+        </div>
+
+        <div class="micro-row">
+            <div class="micro-group" style="min-width: 90px;">
+                <span class="micro-label">Lvl</span>
+                <span class="micro-val highlight" id="micro-level">0</span>
+                <div class="micro-progress-bg">
+                    <div class="micro-progress-fill" id="micro-bar"></div>
+                </div>
+            </div>
+            <div class="micro-sep"></div>
+            <div class="micro-group">
+                <span class="micro-label">XP:</span>
+                <span class="micro-val" id="micro-xp">0</span>
+            </div>
+            <div class="micro-sep"></div>
+            <div class="micro-group">
+                <span class="micro-label">Tok:</span>
+                <span class="micro-val active" id="micro-tokens">0</span>
+            </div>
+            <div class="micro-sep"></div>
+            <div class="micro-group">
+                <span class="micro-label">Left:</span>
+                <span class="micro-val highlight" id="micro-calc">--</span>
+            </div>
+        </div>
+    </div>
+
+    <header id="drag-handle">
+        <div class="header-controls">
+            <a href="https://pinkiprim.github.io/pinkiapps.html" class="nav-icon">🏠</a>
+            <span class="settings-icon" onclick="toggleSettings()">⚙️</span>
+        </div>
+        
+        <div class="header-title">ZG OPS</div>
+        
+        <div id="sky-container">
+            <div class="drop-group drop-1"><div class="parachute">🪂</div><div class="crate">📦</div></div>
+            <div class="drop-group drop-2"><div class="parachute">🪂</div><div class="crate">📦</div></div>
+            <div class="drop-group drop-3"><div class="parachute">🪂</div><div class="crate">📦</div></div>
+            <div class="drop-group drop-4"><div class="parachute">🪂</div><div class="crate">📦</div></div>
+            <div class="drop-group drop-5"><div class="parachute">🪂</div><div class="crate">📦</div></div>
+        </div>
+
+        <div class="header-controls" style="flex-direction:column; gap:2px; align-items:flex-end;">
+            <button id="mini-btn" onclick="toggleMini()">MINI</button>
+            <span id="clock">00:00</span>
+        </div>
+    </header>
+
+    <div id="content">
+        
+        <div class="destination-display" id="dest-box">
+            <div class="dest-label">Next Destination</div>
+            <div class="dest-value" id="disp-destination">Waiting for cargo...</div>
+            <div id="multi-warning" class="multi-warning">⚠ Multiple Cargo Types ⚠</div>
+        </div>
+
+        <div class="horizontal-row">
+            <div class="stat-item">
+                <div class="label">Pilot Level</div>
+                <div class="value highlight" style="font-size:1.4em" id="disp-level">...</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Current XP</div>
+                <div class="value" id="disp-xp">0</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Progress</div>
+                <div class="progress-container" style="width:120px;">
+                    <div class="progress-bar" id="level-bar"></div>
+                    <div class="progress-text" id="level-text">0%</div>
+                </div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">XP To Next</div>
+                <div class="value" id="disp-xp-remaining">0</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Current Flight XP</div>
+                <div class="value" id="disp-flight-xp" style="color:var(--green)">0 XP</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Avg XP/Flight</div>
+                <div class="value" id="disp-flight-avg">0 XP</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">BXP Tokens</div>
+                <div class="value bxp" id="disp-bxp">0</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Flights Done</div>
+                <div class="value" id="disp-ops" style="color:var(--accent)">0</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item" style="min-width:150px;">
+                <div class="label">📦 Cargo <span id="sync-status" class="sync-dot"></span></div>
+                <div class="value" id="trunk-capacity" style="font-size:0.85em;">0/0kg</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item" style="min-width:180px;">
+                <div class="label">Flight Calculator</div>
+                <div style="display:flex; gap:3px; align-items:center;">
+                    <input type="number" id="target-input" placeholder="Target XP" style="width:100px; margin:0;">
+                    <button class="quick-btn" onclick="setCalc(100000)" style="margin:0;">100K</button>
+                    <button class="quick-btn" onclick="setCalc(1000000)" style="margin:0;">1M</button>
+                </div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Flights Left</div>
+                <div class="value" id="calc-result">--</div>
+            </div>
+        </div>
+        
+        <div id="trunk-list" style="display:none;"></div>
+
+    </div>
+    <div id="resize-handle" style="position:absolute; bottom:0; right:0; width:15px; height:15px; cursor:nwse-resize;"></div>
+</div>
+
+<div id="settings-panel">
+    <div style="font-size:1.1em; font-weight:bold; margin-bottom:15px; color:var(--primary); text-transform:uppercase; letter-spacing:1px;">Settings</div>
+    
+    <div class="settings-row">
+        <div class="settings-label">Font Size</div>
+        <div class="settings-control">
+            <button class="font-btn" onclick="changeFontSize(-1)">−</button>
+            <span class="font-value" id="font-size-display">100%</span>
+            <button class="font-btn" onclick="changeFontSize(1)">+</button>
+        </div>
+    </div>
+    
+    <div class="settings-row">
+        <div class="settings-label">Reset Font</div>
+        <div class="settings-control">
+            <button class="font-btn" onclick="resetFontSize()">Reset</button>
+        </div>
+    </div>
+</div>
+<div id="job-list" style="display:none;"></div>
+<table id="summary-table" style="display:none;"></table>
+
+<script>
+// --- AIRPORT DATABASE ---
+const AIRPORTS = {
+    "LSIA": "Los Santos INTL.", "SSIA": "Sandy Sh. INTL. Airport", "ZMA": "Zancudo Military Airport",
+    "RAM": "Arroyo Muerto Municipal", "PBA": "Arroyo Muerto Municipal", 
+    "POA": "Pacific Ocean Airport", "MGA": "Mount Gorgo Airport",
+    "CIA": "Chumash Island Airport", "SCA": "San Chianski Airport", "POP": "PostOp Airport",
+    "SAN": "Sandy Shores Airfield", "MKA": "McKenzie Airfield", "CPA": "Cayo Perico Airfield",
+    "TVH": "Tongva Hills Airfield", "CV": "Carrier"
+};
+
+// --- STATE ---
+let TRUNK_KEY = null;
+let LAST_VEHICLE = null; 
+const STORAGE_KEY_CALC = "target_xp_cargo";
+const STORAGE_KEY_MINI = "mini_mode_cargo";
+const STORAGE_KEY_FONTSIZE = "font_size_cargo";
+
+let MEMORY = {
+    inventory: {},
+    trunk: {},
+    weight: 0,
+    lastTrunkUpdate: 0
+};
+
+const JOB_EXP_KEY = "exp_piloting_cargos";
+const JOB_BXP_KEY = "exp_token_a|piloting|cargos";
+
+const STATE = {
+    currentXP: 0, 
+    runActive: false,
+    runStartXP: 0, 
+    currentRunGain: 0, 
+    completedRuns: 0,
+    totalRunXP: 0, 
+    avgRunXP: 0
+};
+
+// --- INIT ---
+const savedTarget = localStorage.getItem(STORAGE_KEY_CALC);
+if (savedTarget) document.getElementById('target-input').value = savedTarget;
+
+const savedMini = localStorage.getItem(STORAGE_KEY_MINI);
+if (savedMini === "true") {
+    document.getElementById('tracker-app').classList.add('mini-mode');
+    document.getElementById('mini-btn').innerText = "FULL";
+}
+
+const savedFontSize = localStorage.getItem(STORAGE_KEY_FONTSIZE);
+if (savedFontSize) {
+    document.getElementById('content').style.fontSize = savedFontSize + '%';
+    document.getElementById('font-size-display').innerText = savedFontSize + '%';
+} else {
+    document.getElementById('font-size-display').innerText = '100%';
+}
+
+function toggleMini() {
+    const app = document.getElementById('tracker-app');
+    app.classList.toggle('mini-mode');
+    const isMini = app.classList.contains('mini-mode');
+    document.getElementById('mini-btn').innerText = isMini ? "FULL" : "MINI";
+    localStorage.setItem(STORAGE_KEY_MINI, isMini);
+}
+
+function toggleSettings() {
+    const panel = document.getElementById('settings-panel');
+    panel.classList.toggle('show');
+}
+
+function changeFontSize(delta) {
+    const content = document.getElementById('content');
+    const display = document.getElementById('font-size-display');
+    let current = parseInt(localStorage.getItem(STORAGE_KEY_FONTSIZE) || '100');
+    current += (delta * 10);
+    current = Math.max(60, Math.min(200, current));
+    content.style.fontSize = current + '%';
+    display.innerText = current + '%';
+    localStorage.setItem(STORAGE_KEY_FONTSIZE, current);
+}
+
+function resetFontSize() {
+    const content = document.getElementById('content');
+    const display = document.getElementById('font-size-display');
+    content.style.fontSize = '100%';
+    display.innerText = '100%';
+    localStorage.setItem(STORAGE_KEY_FONTSIZE, '100');
+}
+
+// --- CLOCK ---
+setInterval(() => {
+    document.getElementById('clock').innerText = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}, 1000);
+
+// --- ENGINE ---
+function requestData() {
+    if(window.parent) {
+        try { 
+            let keys = [
+                "exp_piloting_cargos", "exp_token_a|piloting|cargos", 
+                "inventory", "vehicle", "plate", 
+                "chest", "trunkCapacity", "trunkWeight"
+            ];
+            if(TRUNK_KEY) keys.push(TRUNK_KEY);
+            window.parent.postMessage({ type: "getNamedData", keys: keys }, "*");
+            window.parent.postMessage({ type: "getData" }, "*"); 
+        } catch(e) {}
+    }
+}
+setInterval(requestData, 1000); 
+
+window.addEventListener('message', (event) => {
+    let payload = event.data;
+    if (payload && payload.type === 'data' && payload.data) payload = payload.data;
+    if (!payload) return;
+
+    processPayload(payload);
+});
+
+function processPayload(data) {
+    // 1. SMART VEHICLE DETECTION
+    let incomingPlate = data.plate || data.vehicle;
+    if (incomingPlate) {
+        if(LAST_VEHICLE && LAST_VEHICLE !== incomingPlate) {
+            MEMORY.trunk = {}; 
+            MEMORY.weight = 0;
+            TRUNK_KEY = null;
+            STATE.runActive = false;
+            STATE.currentRunGain = 0;
+        }
+        LAST_VEHICLE = incomingPlate;
+    }
+
+    // 2. TRUNK KEY DISCOVERY
+    if(data.chest && typeof data.chest === 'string' && data.chest.includes("veh_")) {
+        TRUNK_KEY = "chest_" + data.chest;
+    }
+    if(!TRUNK_KEY) {
+        for(let key in data) {
+            if(key.startsWith("chest_") && key.includes("veh_") && typeof data[key] === 'string' && data[key] !== "{}") {
+                TRUNK_KEY = key;
+                break;
+            }
+        }
+    }
+
+    // 3. PARSE INVENTORIES
+    if(data.inventory) {
+        try { MEMORY.inventory = (typeof data.inventory === 'string') ? JSON.parse(data.inventory) : data.inventory; } catch(e){}
+    }
+    
+    // UPDATE WEIGHT
+    if(data.trunkWeight !== undefined) MEMORY.weight = Math.round(data.trunkWeight);
+    
+    // TRUNK PARSING LOGIC
+    let incomingTrunk = null;
+    if(TRUNK_KEY && data[TRUNK_KEY]) {
+        try { 
+            if(data[TRUNK_KEY] !== "") {
+                incomingTrunk = (typeof data[TRUNK_KEY] === 'string') ? JSON.parse(data[TRUNK_KEY]) : data[TRUNK_KEY];
+            }
+        } catch(e){}
+    }
+
+    const syncDot = document.getElementById('sync-status');
+    const now = Date.now();
+
+    if(incomingTrunk && Object.keys(incomingTrunk).length > 0) {
+        MEMORY.trunk = incomingTrunk;
+        MEMORY.lastTrunkUpdate = now;
+        syncDot.className = "sync-dot live";
+    } 
+    else if (MEMORY.weight === 0) {
+        MEMORY.trunk = {};
+        MEMORY.lastTrunkUpdate = now;
+        syncDot.className = "sync-dot live";
+    }
+    else {
+        if(now - MEMORY.lastTrunkUpdate > 3000) {
+            syncDot.className = "sync-dot cached";
+        }
+    }
+
+    // 4. DESTINATION & RUN DETECTION
+    let hasCargo = checkForCargo(MEMORY.inventory, MEMORY.trunk);
+    
+    // 5. XP LOGIC
+    let currentXP = data[JOB_EXP_KEY];
+    if(!currentXP && MEMORY.inventory[JOB_EXP_KEY]) currentXP = MEMORY.inventory[JOB_EXP_KEY];
+
+    if (typeof currentXP === 'number') {
+        updateRunLogic(currentXP, hasCargo);
+        renderStats();
+    }
+
+    // 6. RENDER UI
+    if(data.trunkCapacity !== undefined) {
+        let txt = `${MEMORY.weight}/${Math.round(data.trunkCapacity)}kg`;
+        document.getElementById('trunk-capacity').innerText = txt;
+        document.getElementById('micro-weight').innerText = txt;
+    }
+
+    // 7. BXP LOGIC
+    let bxp = data[JOB_BXP_KEY];
+    if(!bxp && MEMORY.inventory[JOB_BXP_KEY]) bxp = MEMORY.inventory[JOB_BXP_KEY];
+    if (bxp) {
+        let val = (typeof bxp === 'object') ? bxp.amount : bxp;
+        let txt = formatNumber(val);
+        document.getElementById('disp-bxp').innerText = txt;
+        document.getElementById('micro-tokens').innerText = txt;
+    }
+}
+
+// --- FLIGHT SESSION LOGIC ---
+
+function checkForCargo(pockets, trunk) {
+    let cargoCounts = {}; // { "LSIA": 5, "SCA": 100 }
+    let cargoFound = false;
+
+    // Helper: Scans an inventory object and counts cargo types
+    const scan = (inv) => {
+        if(!inv) return;
+        for (const key in inv) {
+            const item = inv[key];
+            
+            // Normalize quantity (handle different data structures)
+            let qty = 0;
+            if (typeof item === 'number') qty = item;
+            else if (typeof item === 'object') qty = item.amount || item.count || 0;
+            
+            if (qty <= 0) continue;
+
+            const upperKey = key.toUpperCase();
+            if(upperKey.includes("CARGO")) {
+                for(const code in AIRPORTS) {
+                    if (upperKey.includes(code)) {
+                        if (!cargoCounts[code]) cargoCounts[code] = 0;
+                        cargoCounts[code] += qty;
+                        cargoFound = true;
+                    }
+                }
+            }
+        }
+    };
+
+    scan(trunk);
+    scan(pockets);
+    
+    const box = document.getElementById('dest-box');
+    const txt = document.getElementById('disp-destination');
+    const warningEl = document.getElementById('multi-warning');
+    const microDest = document.getElementById('micro-dest');
+    
+    if (!cargoFound) {
+        txt.innerText = "Waiting for cargo...";
+        microDest.innerText = "No Cargo";
+        box.style.borderColor = "var(--accent)";
+        box.style.background = "rgba(255, 193, 7, 0.1)";
+        txt.style.color = "#fff";
+        warningEl.style.display = "none";
+        return false; 
+    }
+
+    const locations = Object.keys(cargoCounts);
+    let bestLoc = locations[0];
+    for (let loc of locations) {
+        if (cargoCounts[loc] > cargoCounts[bestLoc]) {
+            bestLoc = loc;
+        }
+    }
+
+    let destText = `${bestLoc} - ${AIRPORTS[bestLoc]}`;
+    txt.innerText = destText;
+    microDest.innerText = destText.substring(0, 15);
+    
+    box.style.borderColor = "var(--green)";
+    box.style.background = "rgba(0, 230, 118, 0.1)";
+    txt.style.color = "var(--green)";
+
+    if (locations.length > 1) {
+        warningEl.style.display = "block";
+        warningEl.innerText = `⚠ Multiple Cargo Types ⚠`;
+    } else {
+        warningEl.style.display = "none";
+    }
+
+    return true; 
+}
+
+function updateRunLogic(currentXP, hasCargo) {
+    if (STATE.currentXP === 0) STATE.currentXP = currentXP;
+
+    // A. DETECT START OF RUN
+    if (hasCargo && !STATE.runActive) {
+        STATE.runActive = true;
+        STATE.runStartXP = currentXP;
+        STATE.currentRunGain = 0;
+    }
+
+    // B. TRACK XP DURING RUN
+    if (STATE.runActive) {
+        if (currentXP > STATE.runStartXP) {
+            STATE.currentRunGain = currentXP - STATE.runStartXP;
+        }
+    }
+
+    // C. DETECT END OF RUN (Delivery)
+    if (!hasCargo && STATE.runActive) {
+        STATE.completedRuns++;
+        STATE.totalRunXP += STATE.currentRunGain;
+        STATE.avgRunXP = STATE.totalRunXP / STATE.completedRuns;
+        
+        STATE.runActive = false;
+        STATE.currentRunGain = 0;
+    }
+
+    STATE.currentXP = currentXP;
+}
+
+function renderStats() {
+    const lvl = getLevelInfo(STATE.currentXP);
+    const xpTxt = formatNumber(STATE.currentXP);
+    
+    document.getElementById('disp-xp').innerText = xpTxt;
+    document.getElementById('micro-xp').innerText = xpTxt;
+    
+    document.getElementById('disp-level').innerText = lvl.level;
+    document.getElementById('micro-level').innerText = lvl.level;
+    
+    const pct = getPercentValue(lvl.expInLevel, lvl.expForNext);
+    document.getElementById('level-bar').style.width = pct + "%";
+    document.getElementById('level-text').innerText = pct + "%";
+    document.getElementById('micro-bar').style.width = pct + "%";
+
+    document.getElementById('disp-flight-xp').innerText = formatNumber(STATE.currentRunGain) + " XP";
+    document.getElementById('disp-flight-avg').innerText = Math.round(STATE.avgRunXP) + " XP";
+    document.getElementById('disp-ops').innerText = STATE.completedRuns;
+
+    const needed = Math.round(lvl.expForNext - lvl.expInLevel);
+    document.getElementById('disp-xp-remaining').innerText = formatNumber(needed);
+
+    runCalculator();
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(2) + "M";
+    if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+    return num.toLocaleString();
+}
+
+function getLevelInfo(exp) {
+    let level = 0, xpCap = 5;
+    while (exp >= xpCap) { exp -= xpCap; level++; xpCap = (level + 1) * 5; }
+    return { level, expInLevel: exp, expForNext: xpCap };
+}
+
+function getPercentValue(exp, cap) {
+    return Math.min(100, Math.max(0, ((exp / cap) * 100))).toFixed(1);
+}
+
+// --- CALCULATOR ---
+const calcInput = document.getElementById('target-input');
+if(calcInput) calcInput.addEventListener('input', runCalculator);
+
+function setCalc(amount) {
+    document.getElementById('target-input').value = amount;
+    runCalculator();
+}
+
+function runCalculator() {
+    const val = document.getElementById('target-input').value;
+    const el = document.getElementById('calc-result');
+    const microEl = document.getElementById('micro-calc');
+    
+    localStorage.setItem(STORAGE_KEY_CALC, val);
+
+    if (STATE.avgRunXP === 0) { 
+        el.innerText = "Wait.."; 
+        microEl.innerText = "Wait..";
+        return; 
+    }
+    if (!val) { 
+        el.innerText = "--"; 
+        microEl.innerText = "Set..";
+        return; 
+    }
+
+    let inputVal = parseInt(val.replace(/,/g, ''));
+    let targetXP = inputVal;
+    
+    if (inputVal < 200) { 
+         let lvlXP = 0; 
+         for(let i=0; i<inputVal; i++) lvlXP += (5 * i * (i + 1)) / 2;
+         targetXP = (5 * inputVal * (inputVal + 1)) / 2;
+    }
+
+    if (targetXP > STATE.currentXP) {
+        const diff = targetXP - STATE.currentXP;
+        const ops = Math.ceil(diff / STATE.avgRunXP);
+        el.innerText = formatNumber(ops);
+        microEl.innerText = formatNumber(ops);
+    } else {
+        el.innerText = "0";
+        microEl.innerText = "Done";
+    }
+}
+
+// --- TRUNK LIST UI ---
+function renderTrunkList(trunk) {
+    const el = document.getElementById('trunk-list');
+    el.innerHTML = "";
+    
+    if((!trunk || Object.keys(trunk).length === 0) && MEMORY.weight > 0) {
+        el.innerHTML = "<div style='color:var(--orange); font-style:italic;'>⚠ Cargo Detected<br>(Open Trunk to Sync)</div>";
+        return;
+    }
+    
+    if(!trunk || Object.keys(trunk).length === 0) {
+        el.innerHTML = "Cargo hold is empty.";
+        return;
+    }
+
+    for(let key in trunk) {
+        let item = trunk[key];
+        let qty = item.amount || item.count || item;
+        if(qty > 0) {
+            el.innerHTML += `<div class="trunk-item"><span>${key}</span><span>x${qty}</span></div>`;
+        }
+    }
+}
+
+// --- DRAG HANDLER ---
+let elmnt = document.getElementById("tracker-app");
+let header = document.getElementById("drag-handle");
+let microView = document.getElementById("micro-view");
+let isDragging = false;
+let startX, startY, initialLeft, initialTop;
+
+header.addEventListener("mousedown", dragStart);
+microView.addEventListener("mousedown", dragStart);
+
+function dragStart(e) {
+    if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'A') return;
+    e.preventDefault();
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    const rect = elmnt.getBoundingClientRect();
+    initialLeft = rect.left;
+    initialTop = rect.top;
+    document.addEventListener("mousemove", dragMove);
+    document.addEventListener("mouseup", dragEnd);
+}
+
+function dragMove(e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    elmnt.style.left = `${initialLeft + dx}px`;
+    elmnt.style.top = `${initialTop + dy}px`;
+}
+
+function dragEnd() {
+    isDragging = false;
+    document.removeEventListener("mousemove", dragMove);
+    document.removeEventListener("mouseup", dragEnd);
+}
+
+const rh = document.getElementById('resize-handle');
+if (rh) {
+    rh.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        window.addEventListener('mousemove', resize);
+        window.addEventListener('mouseup', stopResize);
+    });
+}
+function resize(e) {
+    if(elmnt.classList.contains('mini-mode')) return;
+    elmnt.style.width = Math.max(280, e.clientX - elmnt.getBoundingClientRect().left) + 'px';
+    elmnt.style.height = Math.max(200, e.clientY - elmnt.getBoundingClientRect().top) + 'px';
+}
+function stopResize() {
+    window.removeEventListener('mousemove', resize);
+    window.removeEventListener('mouseup', stopResize);
+}
+
+// Close settings panel when clicking outside
+document.addEventListener('click', (e) => {
+    const panel = document.getElementById('settings-panel');
+    const settingsIcon = document.querySelector('.settings-icon');
+    if (panel.classList.contains('show') && !panel.contains(e.target) && e.target !== settingsIcon) {
+        panel.classList.remove('show');
+    }
+});
+</script>
+</body>
 </html>
