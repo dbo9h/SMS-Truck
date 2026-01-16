@@ -29,7 +29,7 @@
             user-select: none;
         }
 
-        #tracker-app {
+        .tracker-app {
             position: absolute;
             top: 20px; 
             left: 2vw;
@@ -45,6 +45,9 @@
             min-height: 140px;
             transition: none;
         }
+        
+        #tracker-app { top: 20px; }
+        #trucking-tracker-app { top: 180px; display: none; }
 
         /* --- MINI MODE --- */
         #tracker-app.mini-mode {
@@ -60,8 +63,13 @@
         #tracker-app.mini-mode header, 
         #tracker-app.mini-mode #sky-container,
         #tracker-app.mini-mode #content { display: none !important; }
+        
+        #trucking-tracker-app.mini-mode header, 
+        #trucking-tracker-app.mini-mode #trucking-sky-container,
+        #trucking-tracker-app.mini-mode #trucking-content { display: none !important; }
 
-        #micro-view {
+        #micro-view,
+        #trucking-micro-view {
             display: none;
             flex-direction: column;
             justify-content: center;
@@ -71,6 +79,7 @@
             cursor: move;
         }
         #tracker-app.mini-mode #micro-view { display: flex; }
+        #trucking-tracker-app.mini-mode #trucking-micro-view { display: flex; }
 
         .micro-row { display: flex; justify-content: space-between; align-items: center; width: 100%; height: 50%; }
         .micro-group { display: flex; align-items: center; gap: 8px; }
@@ -101,6 +110,10 @@
             border-bottom: 1px solid rgba(255,255,255,0.15);
             overflow: hidden;
         }
+        
+        #trucking-drag-handle {
+            background: linear-gradient(180deg, #994400, rgba(204, 85, 0, 0.2));
+        }
 
         .header-title {
             position: absolute; left: 50%; top: 50%;
@@ -112,9 +125,11 @@
             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
             z-index: 10;
         }
+        
 
         /* ANIMATION CONTAINER */
-        #sky-container {
+        #sky-container,
+        #trucking-sky-container {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             overflow: hidden;
@@ -170,13 +185,17 @@
         .nav-icon { text-decoration: none; font-size: 1em; cursor: pointer; color: #ccc; }
         .nav-icon:hover { color: #fff; }
         
-        #mini-btn { font-family: 'Rajdhani', sans-serif; font-weight: bold; font-size: 0.7em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: #ccc; padding: 2px 5px; border-radius: 4px; cursor: pointer; }
-        #mini-btn:hover { background: var(--primary); color: white; border-color: var(--accent); }
+        #mini-btn,
+        #trucking-mini-btn { font-family: 'Rajdhani', sans-serif; font-weight: bold; font-size: 0.7em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: #ccc; padding: 2px 5px; border-radius: 4px; cursor: pointer; }
+        #mini-btn:hover,
+        #trucking-mini-btn:hover { background: var(--primary); color: white; border-color: var(--accent); }
         
-        #clock { font-family: 'Rajdhani', sans-serif; font-weight: 700; color: #fff; font-size: 0.75em; z-index: 20; }
+        #clock,
+        #trucking-clock { font-family: 'Rajdhani', sans-serif; font-weight: 700; color: #fff; font-size: 0.75em; z-index: 20; }
 
         /* --- CONTENT --- */
-        #content { padding: 8px 12px; flex: 1; overflow-y: hidden; overflow-x: auto; scrollbar-width: thin; display: flex; flex-direction: row; gap: 12px; align-items: stretch; }
+        #content,
+        #trucking-content { padding: 8px 12px; flex: 1; overflow-y: hidden; overflow-x: auto; scrollbar-width: thin; display: flex; flex-direction: row; gap: 12px; align-items: stretch; }
 
         .destination-display { background: rgba(255, 193, 7, 0.1); border: 1px dashed var(--accent); border-radius: 6px; padding: 8px 15px; text-align: center; transition: all 0.3s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 200px; flex-shrink: 0; }
         .dest-label { font-size: 0.65em; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
@@ -315,7 +334,7 @@
 </head>
 <body>
 
-<div id="tracker-app">
+<div id="tracker-app" class="tracker-app">
     <div id="micro-view" onmousedown="dragMouseDown(event)">
         <button class="micro-btn" onclick="toggleMini()">EXPAND</button>
         
@@ -365,7 +384,7 @@
             <span class="settings-icon" onclick="toggleSettings()">⚙️</span>
         </div>
         
-        <div class="header-title">بدر الدجه ياخوي وش ذا ترا صدق كريه!!!</div>
+        <div class="header-title">Cargo Tracker</div>
         
         <div id="sky-container">
             <div class="drop-group drop-1"><div class="parachute">🪂</div><div class="crate">📦</div></div>
@@ -480,6 +499,165 @@
     <div id="resize-handle" style="position:absolute; bottom:0; right:0; width:15px; height:15px; cursor:nwse-resize;"></div>
 </div>
 
+<div id="trucking-tracker-app" class="tracker-app">
+    <div id="trucking-micro-view" onmousedown="dragMouseDownTrucking(event)">
+        <button class="micro-btn" onclick="toggleMiniTrucking()">EXPAND</button>
+        
+        <div class="micro-row" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <div class="micro-group">
+                <span style="font-size:1.2em">🚛</span>
+                <span class="micro-val highlight">TRUCKING</span>
+            </div>
+            <div class="micro-group">
+                <span class="micro-label">Dest:</span>
+                <span class="micro-val" id="trucking-micro-dest" style="max-width:140px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">--</span>
+            </div>
+            <div class="micro-group">
+                <span class="micro-label">Load:</span>
+                <span class="micro-val active" id="trucking-micro-weight">0kg</span>
+            </div>
+        </div>
+
+        <div class="micro-row">
+            <div class="micro-group" style="min-width: 90px;">
+                <span class="micro-label">Lvl</span>
+                <span class="micro-val highlight" id="trucking-micro-level">0</span>
+                <div class="micro-progress-bg">
+                    <div class="micro-progress-fill" id="trucking-micro-bar"></div>
+                </div>
+            </div>
+            <div class="micro-sep"></div>
+            <div class="micro-group">
+                <span class="micro-label">XP:</span>
+                <span class="micro-val" id="trucking-micro-xp">0</span>
+            </div>
+            <div class="micro-sep"></div>
+            <div class="micro-group">
+                <span class="micro-label">Tok:</span>
+                <span class="micro-val active" id="trucking-micro-tokens">0</span>
+            </div>
+            <div class="micro-sep"></div>
+            <div class="micro-group">
+                <span class="micro-label">Left:</span>
+                <span class="micro-val highlight" id="trucking-micro-calc">--</span>
+            </div>
+        </div>
+    </div>
+
+    <header id="trucking-drag-handle">
+        <div class="header-controls">
+            <span class="settings-icon" onclick="toggleSettings()">⚙️</span>
+        </div>
+        
+        <div class="header-title">Trucking Tracker</div>
+        
+        <div id="trucking-sky-container">
+            <div class="drop-group drop-1"><div class="parachute">🚛</div><div class="crate">📦</div></div>
+            <div class="drop-group drop-2"><div class="parachute">🚛</div><div class="crate">📦</div></div>
+            <div class="drop-group drop-3"><div class="parachute">🚛</div><div class="crate">📦</div></div>
+            <div class="drop-group drop-4"><div class="parachute">🚛</div><div class="crate">📦</div></div>
+            <div class="drop-group drop-5"><div class="parachute">🚛</div><div class="crate">📦</div></div>
+        </div>
+
+        <div class="header-controls" style="flex-direction:row; gap:6px; align-items:center;">
+            <span class="minimize-btn" onclick="minimizeUITrucking()" title="Minimize">−</span>
+            <button id="trucking-mini-btn" onclick="toggleMiniTrucking()">MINI</button>
+            <span id="trucking-clock">00:00</span>
+        </div>
+    </header>
+
+    <div id="trucking-content">
+        
+        <div class="horizontal-row">
+            <div class="stat-item">
+                <div class="label">Trucker Level</div>
+                <div class="value highlight" style="font-size:1.4em" id="trucking-disp-level">...</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Current XP</div>
+                <div class="value" id="trucking-disp-xp">0</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Progress</div>
+                <div class="progress-container" style="width:120px;">
+                    <div class="progress-bar" id="trucking-level-bar"></div>
+                    <div class="progress-text" id="trucking-level-text">0%</div>
+                </div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">XP To Next</div>
+                <div class="value" id="trucking-disp-xp-remaining">0</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Current Run XP</div>
+                <div class="value" id="trucking-disp-flight-xp" style="color:var(--green)">0 XP</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Avg XP/Run</div>
+                <div class="value" id="trucking-disp-flight-avg">0 XP</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">BXP Tokens</div>
+                <div class="value bxp" id="trucking-disp-bxp">0</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item">
+                <div class="label">Runs Done</div>
+                <div class="value" id="trucking-disp-ops" style="color:var(--accent)">0</div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-item" style="min-width:150px;">
+                <div class="label">🚛 Cargo <span id="trucking-sync-status" class="sync-dot"></span></div>
+                <div class="value" id="trucking-trunk-capacity" style="font-size:0.85em;">0/0kg</div>
+            </div>
+
+            <div class="stat-separator" id="trucking-calc-sep-1" data-visible="true"></div>
+
+            <div class="stat-item" id="trucking-calc-input-section" style="min-width:180px;" data-visible="true">
+                <div class="label">Run Calculator</div>
+                <div style="display:flex; gap:3px; align-items:center;">
+                    <input type="number" id="trucking-target-input" placeholder="Target XP" style="width:100px; margin:0;">
+                    <button class="quick-btn" onclick="setCalcTrucking(100000)" style="margin:0;">100K</button>
+                    <button class="quick-btn" onclick="setCalcTrucking(1000000)" style="margin:0;">1M</button>
+                </div>
+            </div>
+
+            <div class="stat-separator" id="trucking-calc-sep-2" data-visible="true"></div>
+
+            <div class="stat-item" id="trucking-calc-result-section" data-visible="true">
+                <div class="label">Runs Left</div>
+                <div class="value" id="trucking-calc-result">--</div>
+            </div>
+        </div>
+        
+        <div id="trucking-trunk-list" style="display:none;"></div>
+
+    </div>
+    <div id="trucking-resize-handle" style="position:absolute; bottom:0; right:0; width:15px; height:15px; cursor:nwse-resize;"></div>
+</div>
+
 <div id="minimized-bar" onclick="restoreUI()">
     <span style="font-family:'Rajdhani',sans-serif; font-weight:700; color:var(--primary); font-size:0.9em;">ZG OPS</span>
     <span style="color:#888; font-size:0.8em; margin-left:10px;">Click to restore</span>
@@ -491,9 +669,16 @@
     <div class="control-header">⚙️ ZG OPS Control Panel</div>
     
     <div class="control-row">
-        <div class="control-label">🖥️ Show Main Tracker UI</div>
+        <div class="control-label">📦 Show Cargo Tracker</div>
         <div class="control-toggle">
             <input type="checkbox" id="control-show-tracker" checked onchange="toggleTrackerUI()">
+        </div>
+    </div>
+    
+    <div class="control-row">
+        <div class="control-label">🚛 Show Trucking Tracker</div>
+        <div class="control-toggle">
+            <input type="checkbox" id="control-show-trucking" onchange="toggleTruckingUI()">
         </div>
     </div>
     
@@ -603,8 +788,14 @@ const STORAGE_KEY_OPACITY = "opacity_cargo";
 const STORAGE_KEY_SHOW_DEST = "show_destination_cargo";
 const STORAGE_KEY_SHOW_CALC = "show_calculator_cargo";
 const STORAGE_KEY_SHOW_TRACKER = "show_tracker_cargo";
+const STORAGE_KEY_SHOW_TRUCKING = "show_trucking_tracker";
+
+// Trucking Storage Keys
+const TRUCKING_STORAGE_KEY_CALC = "target_xp_trucking";
+const TRUCKING_STORAGE_KEY_MINI = "mini_mode_trucking";
 
 let APP_VISIBLE = true;
+let TRUCKING_VISIBLE = false;
 let CONTROL_PANEL_VISIBLE = false;
 
 let MEMORY = {
@@ -614,10 +805,33 @@ let MEMORY = {
     lastTrunkUpdate: 0
 };
 
+let TRUCKING_MEMORY = {
+    inventory: {},
+    trunk: {},
+    weight: 0,
+    lastTrunkUpdate: 0
+};
+
+let TRUCKING_TRUNK_KEY = null;
+let TRUCKING_LAST_VEHICLE = null;
+
 const JOB_EXP_KEY = "exp_piloting_cargos";
 const JOB_BXP_KEY = "exp_token_a|piloting|cargos";
 
+const TRUCKING_JOB_EXP_KEY = "exp_trucking_trucking";
+const TRUCKING_JOB_BXP_KEY = "exp_token_a|trucking|trucking";
+
 const STATE = {
+    currentXP: 0, 
+    runActive: false,
+    runStartXP: 0, 
+    currentRunGain: 0, 
+    completedRuns: 0,
+    totalRunXP: 0, 
+    avgRunXP: 0
+};
+
+const TRUCKING_STATE = {
     currentXP: 0, 
     runActive: false,
     runStartXP: 0, 
@@ -640,6 +854,7 @@ if (savedMini === "true") {
 const savedFontSize = localStorage.getItem(STORAGE_KEY_FONTSIZE);
 if (savedFontSize) {
     document.getElementById('content').style.fontSize = savedFontSize + '%';
+    document.getElementById('trucking-content').style.fontSize = savedFontSize + '%';
     document.getElementById('font-size-display').innerText = savedFontSize + '%';
 } else {
     document.getElementById('font-size-display').innerText = '100%';
@@ -686,8 +901,27 @@ if (savedShowTracker === 'false') {
     document.getElementById('control-show-tracker').checked = true;
 }
 
+const savedShowTrucking = localStorage.getItem(STORAGE_KEY_SHOW_TRUCKING);
+if (savedShowTrucking === 'true') {
+    document.getElementById('control-show-trucking').checked = true;
+    document.getElementById('trucking-tracker-app').style.display = 'flex';
+    TRUCKING_VISIBLE = true;
+} else {
+    document.getElementById('control-show-trucking').checked = false;
+}
+
 // Sync control panel font size display
 document.getElementById('control-font-size-display').innerText = document.getElementById('font-size-display').innerText;
+
+// Initialize trucking target input
+const savedTargetTrucking = localStorage.getItem(TRUCKING_STORAGE_KEY_CALC);
+if (savedTargetTrucking) document.getElementById('trucking-target-input').value = savedTargetTrucking;
+
+const savedMiniTrucking = localStorage.getItem(TRUCKING_STORAGE_KEY_MINI);
+if (savedMiniTrucking === "true") {
+    document.getElementById('trucking-tracker-app').classList.add('mini-mode');
+    document.getElementById('trucking-mini-btn').innerText = "FULL";
+}
 
 function toggleMini() {
     const app = document.getElementById('tracker-app');
@@ -697,6 +931,14 @@ function toggleMini() {
     localStorage.setItem(STORAGE_KEY_MINI, isMini);
 }
 
+function toggleMiniTrucking() {
+    const app = document.getElementById('trucking-tracker-app');
+    app.classList.toggle('mini-mode');
+    const isMini = app.classList.contains('mini-mode');
+    document.getElementById('trucking-mini-btn').innerText = isMini ? "FULL" : "MINI";
+    localStorage.setItem(TRUCKING_STORAGE_KEY_MINI, isMini);
+}
+
 function toggleSettings() {
     const panel = document.getElementById('settings-panel');
     panel.classList.toggle('show');
@@ -704,12 +946,14 @@ function toggleSettings() {
 
 function changeFontSize(delta) {
     const content = document.getElementById('content');
+    const truckingContent = document.getElementById('trucking-content');
     const display = document.getElementById('font-size-display');
     const controlDisplay = document.getElementById('control-font-size-display');
     let current = parseInt(localStorage.getItem(STORAGE_KEY_FONTSIZE) || '100');
     current += (delta * 10);
     current = Math.max(60, Math.min(200, current));
     content.style.fontSize = current + '%';
+    if (truckingContent) truckingContent.style.fontSize = current + '%';
     display.innerText = current + '%';
     controlDisplay.innerText = current + '%';
     localStorage.setItem(STORAGE_KEY_FONTSIZE, current);
@@ -748,10 +992,20 @@ function restoreUI() {
     document.getElementById('minimized-bar').classList.remove('show');
 }
 
+function minimizeUITrucking() {
+    document.getElementById('trucking-tracker-app').style.display = 'none';
+}
+
+function restoreUITrucking() {
+    document.getElementById('trucking-tracker-app').style.display = 'flex';
+}
+
 function resetSettings() {
     // Reset font size
     const content = document.getElementById('content');
+    const truckingContent = document.getElementById('trucking-content');
     content.style.fontSize = '100%';
+    if (truckingContent) truckingContent.style.fontSize = '100%';
     document.getElementById('font-size-display').innerText = '100%';
     document.getElementById('control-font-size-display').innerText = '100%';
     localStorage.setItem(STORAGE_KEY_FONTSIZE, '100');
@@ -851,6 +1105,20 @@ function toggleTrackerUI() {
     localStorage.setItem(STORAGE_KEY_SHOW_TRACKER, checked);
 }
 
+function toggleTruckingUI() {
+    const checked = document.getElementById('control-show-trucking').checked;
+    const app = document.getElementById('trucking-tracker-app');
+    
+    if (checked) {
+        app.style.display = 'flex';
+        TRUCKING_VISIBLE = true;
+    } else {
+        app.style.display = 'none';
+        TRUCKING_VISIBLE = false;
+    }
+    localStorage.setItem(STORAGE_KEY_SHOW_TRUCKING, checked);
+}
+
 function toggleControlPanel() {
     const panel = document.getElementById('control-panel');
     const overlay = document.getElementById('control-overlay');
@@ -872,7 +1140,9 @@ function toggleAppVisibility() {
 
 // --- CLOCK ---
 setInterval(() => {
-    document.getElementById('clock').innerText = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    document.getElementById('clock').innerText = time;
+    document.getElementById('trucking-clock').innerText = time;
 }, 1000);
 
 // --- ENGINE ---
@@ -880,11 +1150,13 @@ function requestData() {
     if(window.parent) {
         try { 
             let keys = [
-                "exp_piloting_cargos", "exp_token_a|piloting|cargos", 
+                "exp_piloting_cargos", "exp_token_a|piloting|cargos",
+                "exp_trucking_trucking", "exp_token_a|trucking|trucking",
                 "inventory", "vehicle", "plate", 
                 "chest", "trunkCapacity", "trunkWeight"
             ];
             if(TRUNK_KEY) keys.push(TRUNK_KEY);
+            if(TRUCKING_TRUNK_KEY) keys.push(TRUCKING_TRUNK_KEY);
             window.parent.postMessage({ type: "getNamedData", keys: keys }, "*");
             window.parent.postMessage({ type: "getData" }, "*"); 
         } catch(e) {}
@@ -898,6 +1170,7 @@ window.addEventListener('message', (event) => {
     if (!payload) return;
 
     processPayload(payload);
+    processPayloadTrucking(payload);
 });
 
 function processPayload(data) {
@@ -991,6 +1264,102 @@ function processPayload(data) {
         let txt = formatNumber(val);
         document.getElementById('disp-bxp').innerText = txt;
         document.getElementById('micro-tokens').innerText = txt;
+    }
+}
+
+function processPayloadTrucking(data) {
+    if (!TRUCKING_VISIBLE) return;
+    
+    // 1. SMART VEHICLE DETECTION
+    let incomingPlate = data.plate || data.vehicle;
+    if (incomingPlate) {
+        if(TRUCKING_LAST_VEHICLE && TRUCKING_LAST_VEHICLE !== incomingPlate) {
+            TRUCKING_MEMORY.trunk = {}; 
+            TRUCKING_MEMORY.weight = 0;
+            TRUCKING_TRUNK_KEY = null;
+            TRUCKING_STATE.runActive = false;
+            TRUCKING_STATE.currentRunGain = 0;
+        }
+        TRUCKING_LAST_VEHICLE = incomingPlate;
+    }
+
+    // 2. TRUNK KEY DISCOVERY
+    if(data.chest && typeof data.chest === 'string' && data.chest.includes("veh_")) {
+        TRUCKING_TRUNK_KEY = "chest_" + data.chest;
+    }
+    if(!TRUCKING_TRUNK_KEY) {
+        for(let key in data) {
+            if(key.startsWith("chest_") && key.includes("veh_") && typeof data[key] === 'string' && data[key] !== "{}") {
+                TRUCKING_TRUNK_KEY = key;
+                break;
+            }
+        }
+    }
+
+    // 3. PARSE INVENTORIES
+    if(data.inventory) {
+        try { TRUCKING_MEMORY.inventory = (typeof data.inventory === 'string') ? JSON.parse(data.inventory) : data.inventory; } catch(e){}
+    }
+    
+    // UPDATE WEIGHT
+    if(data.trunkWeight !== undefined) TRUCKING_MEMORY.weight = Math.round(data.trunkWeight);
+    
+    // TRUNK PARSING LOGIC
+    let incomingTrunk = null;
+    if(TRUCKING_TRUNK_KEY && data[TRUCKING_TRUNK_KEY]) {
+        try { 
+            if(data[TRUCKING_TRUNK_KEY] !== "") {
+                incomingTrunk = (typeof data[TRUCKING_TRUNK_KEY] === 'string') ? JSON.parse(data[TRUCKING_TRUNK_KEY]) : data[TRUCKING_TRUNK_KEY];
+            }
+        } catch(e){}
+    }
+
+    const syncDot = document.getElementById('trucking-sync-status');
+    const now = Date.now();
+
+    if(incomingTrunk && Object.keys(incomingTrunk).length > 0) {
+        TRUCKING_MEMORY.trunk = incomingTrunk;
+        TRUCKING_MEMORY.lastTrunkUpdate = now;
+        syncDot.className = "sync-dot live";
+    } 
+    else if (TRUCKING_MEMORY.weight === 0) {
+        TRUCKING_MEMORY.trunk = {};
+        TRUCKING_MEMORY.lastTrunkUpdate = now;
+        syncDot.className = "sync-dot live";
+    }
+    else {
+        if(now - TRUCKING_MEMORY.lastTrunkUpdate > 3000) {
+            syncDot.className = "sync-dot cached";
+        }
+    }
+
+    // 4. DESTINATION & RUN DETECTION
+    let hasCargo = checkForCargoTrucking(TRUCKING_MEMORY.inventory, TRUCKING_MEMORY.trunk);
+    
+    // 5. XP LOGIC
+    let currentXP = data[TRUCKING_JOB_EXP_KEY];
+    if(!currentXP && TRUCKING_MEMORY.inventory[TRUCKING_JOB_EXP_KEY]) currentXP = TRUCKING_MEMORY.inventory[TRUCKING_JOB_EXP_KEY];
+
+    if (typeof currentXP === 'number') {
+        updateRunLogicTrucking(currentXP, hasCargo);
+        renderStatsTrucking();
+    }
+
+    // 6. RENDER UI
+    if(data.trunkCapacity !== undefined) {
+        let txt = `${TRUCKING_MEMORY.weight}/${Math.round(data.trunkCapacity)}kg`;
+        document.getElementById('trucking-trunk-capacity').innerText = txt;
+        document.getElementById('trucking-micro-weight').innerText = txt;
+    }
+
+    // 7. BXP LOGIC
+    let bxp = data[TRUCKING_JOB_BXP_KEY];
+    if(!bxp && TRUCKING_MEMORY.inventory[TRUCKING_JOB_BXP_KEY]) bxp = TRUCKING_MEMORY.inventory[TRUCKING_JOB_BXP_KEY];
+    if (bxp) {
+        let val = (typeof bxp === 'object') ? bxp.amount : bxp;
+        let txt = formatNumber(val);
+        document.getElementById('trucking-disp-bxp').innerText = txt;
+        document.getElementById('trucking-micro-tokens').innerText = txt;
     }
 }
 
@@ -1125,6 +1494,113 @@ function renderStats() {
     runCalculator();
 }
 
+function checkForCargoTrucking(pockets, trunk) {
+    let cargoCounts = {};
+    let cargoFound = false;
+
+    const scan = (inv) => {
+        if(!inv) return;
+        for (const key in inv) {
+            const item = inv[key];
+            
+            let qty = 0;
+            if (typeof item === 'number') qty = item;
+            else if (typeof item === 'object') qty = item.amount || item.count || 0;
+            
+            if (qty <= 0) continue;
+
+            const upperKey = key.toUpperCase();
+            if(upperKey.includes("CARGO")) {
+                for(const code in AIRPORTS) {
+                    if (upperKey.includes(code)) {
+                        if (!cargoCounts[code]) cargoCounts[code] = 0;
+                        cargoCounts[code] += qty;
+                        cargoFound = true;
+                    }
+                }
+            }
+        }
+    };
+
+    scan(trunk);
+    scan(pockets);
+    
+    const microDest = document.getElementById('trucking-micro-dest');
+    
+    if (!cargoFound) {
+        if (microDest) microDest.innerText = "No Cargo";
+        return false; 
+    }
+
+    const locations = Object.keys(cargoCounts);
+    let bestLoc = locations[0];
+    for (let loc of locations) {
+        if (cargoCounts[loc] > cargoCounts[bestLoc]) {
+            bestLoc = loc;
+        }
+    }
+
+    let destText = `${bestLoc} - ${AIRPORTS[bestLoc]}`;
+    if (microDest) microDest.innerText = destText.substring(0, 15);
+
+    return true; 
+}
+
+function updateRunLogicTrucking(currentXP, hasCargo) {
+    if (TRUCKING_STATE.currentXP === 0) TRUCKING_STATE.currentXP = currentXP;
+
+    // A. DETECT START OF RUN
+    if (hasCargo && !TRUCKING_STATE.runActive) {
+        TRUCKING_STATE.runActive = true;
+        TRUCKING_STATE.runStartXP = currentXP;
+        TRUCKING_STATE.currentRunGain = 0;
+    }
+
+    // B. TRACK XP DURING RUN
+    if (TRUCKING_STATE.runActive) {
+        if (currentXP > TRUCKING_STATE.runStartXP) {
+            TRUCKING_STATE.currentRunGain = currentXP - TRUCKING_STATE.runStartXP;
+        }
+    }
+
+    // C. DETECT END OF RUN (Delivery)
+    if (!hasCargo && TRUCKING_STATE.runActive) {
+        TRUCKING_STATE.completedRuns++;
+        TRUCKING_STATE.totalRunXP += TRUCKING_STATE.currentRunGain;
+        TRUCKING_STATE.avgRunXP = TRUCKING_STATE.totalRunXP / TRUCKING_STATE.completedRuns;
+        
+        TRUCKING_STATE.runActive = false;
+        TRUCKING_STATE.currentRunGain = 0;
+    }
+
+    TRUCKING_STATE.currentXP = currentXP;
+}
+
+function renderStatsTrucking() {
+    const lvl = getLevelInfo(TRUCKING_STATE.currentXP);
+    const xpTxt = formatNumber(TRUCKING_STATE.currentXP);
+    
+    document.getElementById('trucking-disp-xp').innerText = xpTxt;
+    document.getElementById('trucking-micro-xp').innerText = xpTxt;
+    
+    document.getElementById('trucking-disp-level').innerText = lvl.level;
+    document.getElementById('trucking-micro-level').innerText = lvl.level;
+    
+    const pct = getPercentValue(lvl.expInLevel, lvl.expForNext);
+    document.getElementById('trucking-level-bar').style.width = pct + "%";
+    document.getElementById('trucking-level-text').innerText = pct + "%";
+    document.getElementById('trucking-micro-bar').style.width = pct + "%";
+
+    document.getElementById('trucking-disp-flight-xp').innerText = formatNumber(TRUCKING_STATE.currentRunGain) + " XP";
+    document.getElementById('trucking-disp-flight-avg').innerText = Math.round(TRUCKING_STATE.avgRunXP) + " XP";
+    document.getElementById('trucking-disp-ops').innerText = TRUCKING_STATE.completedRuns;
+
+    const needed = Math.round(lvl.expForNext - lvl.expInLevel);
+    document.getElementById('trucking-disp-xp-remaining').innerText = formatNumber(needed);
+
+    runCalculatorTrucking();
+}
+
 function formatNumber(num) {
     if (num >= 1000000) return (num / 1000000).toFixed(2) + "M";
     if (num >= 1000) return (num / 1000).toFixed(1) + "K";
@@ -1145,9 +1621,17 @@ function getPercentValue(exp, cap) {
 const calcInput = document.getElementById('target-input');
 if(calcInput) calcInput.addEventListener('input', runCalculator);
 
+const truckingCalcInput = document.getElementById('trucking-target-input');
+if(truckingCalcInput) truckingCalcInput.addEventListener('input', runCalculatorTrucking);
+
 function setCalc(amount) {
     document.getElementById('target-input').value = amount;
     runCalculator();
+}
+
+function setCalcTrucking(amount) {
+    document.getElementById('trucking-target-input').value = amount;
+    runCalculatorTrucking();
 }
 
 function runCalculator() {
@@ -1180,6 +1664,44 @@ function runCalculator() {
     if (targetXP > STATE.currentXP) {
         const diff = targetXP - STATE.currentXP;
         const ops = Math.ceil(diff / STATE.avgRunXP);
+        el.innerText = formatNumber(ops);
+        microEl.innerText = formatNumber(ops);
+    } else {
+        el.innerText = "0";
+        microEl.innerText = "Done";
+    }
+}
+
+function runCalculatorTrucking() {
+    const val = document.getElementById('trucking-target-input').value;
+    const el = document.getElementById('trucking-calc-result');
+    const microEl = document.getElementById('trucking-micro-calc');
+    
+    localStorage.setItem(TRUCKING_STORAGE_KEY_CALC, val);
+
+    if (TRUCKING_STATE.avgRunXP === 0) { 
+        el.innerText = "Wait.."; 
+        microEl.innerText = "Wait..";
+        return; 
+    }
+    if (!val) { 
+        el.innerText = "--"; 
+        microEl.innerText = "Set..";
+        return; 
+    }
+
+    let inputVal = parseInt(val.replace(/,/g, ''));
+    let targetXP = inputVal;
+    
+    if (inputVal < 200) { 
+         let lvlXP = 0; 
+         for(let i=0; i<inputVal; i++) lvlXP += (5 * i * (i + 1)) / 2;
+         targetXP = (5 * inputVal * (inputVal + 1)) / 2;
+    }
+
+    if (targetXP > TRUCKING_STATE.currentXP) {
+        const diff = targetXP - TRUCKING_STATE.currentXP;
+        const ops = Math.ceil(diff / TRUCKING_STATE.avgRunXP);
         el.innerText = formatNumber(ops);
         microEl.innerText = formatNumber(ops);
     } else {
@@ -1266,6 +1788,66 @@ function resize(e) {
 function stopResize() {
     window.removeEventListener('mousemove', resize);
     window.removeEventListener('mouseup', stopResize);
+}
+
+// --- TRUCKING DRAG HANDLER ---
+let truckingElmnt = document.getElementById("trucking-tracker-app");
+let truckingHeader = document.getElementById("trucking-drag-handle");
+let truckingMicroView = document.getElementById("trucking-micro-view");
+let isTruckingDragging = false;
+let truckingStartX, truckingStartY, truckingInitialLeft, truckingInitialTop;
+
+truckingHeader.addEventListener("mousedown", dragStartTrucking);
+truckingMicroView.addEventListener("mousedown", dragStartTrucking);
+
+function dragStartTrucking(e) {
+    if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'A') return;
+    e.preventDefault();
+    isTruckingDragging = true;
+    truckingStartX = e.clientX;
+    truckingStartY = e.clientY;
+    const rect = truckingElmnt.getBoundingClientRect();
+    truckingInitialLeft = rect.left;
+    truckingInitialTop = rect.top;
+    document.addEventListener("mousemove", dragMoveTrucking);
+    document.addEventListener("mouseup", dragEndTrucking);
+}
+
+function dragMoveTrucking(e) {
+    if (!isTruckingDragging) return;
+    e.preventDefault();
+    const dx = e.clientX - truckingStartX;
+    const dy = e.clientY - truckingStartY;
+    truckingElmnt.style.left = `${truckingInitialLeft + dx}px`;
+    truckingElmnt.style.top = `${truckingInitialTop + dy}px`;
+}
+
+function dragEndTrucking() {
+    isTruckingDragging = false;
+    document.removeEventListener("mousemove", dragMoveTrucking);
+    document.removeEventListener("mouseup", dragEndTrucking);
+}
+
+function dragMouseDownTrucking(event) {
+    dragStartTrucking(event);
+}
+
+const rhTrucking = document.getElementById('trucking-resize-handle');
+if (rhTrucking) {
+    rhTrucking.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        window.addEventListener('mousemove', resizeTrucking);
+        window.addEventListener('mouseup', stopResizeTrucking);
+    });
+}
+function resizeTrucking(e) {
+    if(truckingElmnt.classList.contains('mini-mode')) return;
+    truckingElmnt.style.width = Math.max(280, e.clientX - truckingElmnt.getBoundingClientRect().left) + 'px';
+    truckingElmnt.style.height = Math.max(200, e.clientY - truckingElmnt.getBoundingClientRect().top) + 'px';
+}
+function stopResizeTrucking() {
+    window.removeEventListener('mousemove', resizeTrucking);
+    window.removeEventListener('mouseup', stopResizeTrucking);
 }
 
 // Close settings panel when clicking outside
