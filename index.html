@@ -530,11 +530,11 @@
     
     <div style="display:flex; gap:10px; margin-top:20px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.1);">
         <button class="font-btn" onclick="resetSettings()" style="flex:1;">Reset All Settings</button>
-        <button class="font-btn" onclick="toggleControlPanel()" style="flex:1; background:var(--primary); color:white;">Close (F1)</button>
+        <button class="font-btn" onclick="toggleControlPanel()" style="flex:1; background:var(--primary); color:white;">Close (F2)</button>
     </div>
     
     <div style="text-align:center; margin-top:15px; font-size:0.75em; color:var(--text-dim);">
-        Press <span style="color:var(--primary); font-weight:bold;">F1</span> to toggle this panel
+        Press <span style="color:var(--primary); font-weight:bold;">F2</span> to toggle this panel
     </div>
 </div>
 
@@ -1282,9 +1282,9 @@ document.getElementById('control-overlay').addEventListener('click', () => {
     toggleControlPanel();
 });
 
-// F1 Key Listener (Toggle Control Panel)
+// F2 Key Listener (Toggle Control Panel)
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'F1') {
+    if (e.key === 'F2') {
         e.preventDefault();
         toggleControlPanel();
     }
@@ -1299,16 +1299,16 @@ document.addEventListener('keydown', (e) => {
 // =================================================================
 // CONTROL PANEL SYSTEM - FiveM Integration
 // =================================================================
-// The Control Panel is the main settings interface that appears when F1 is pressed
+// The Control Panel is the main settings interface that appears when F2 is pressed
 // It allows users to show/hide the main tracker UI and configure all settings
 //
 // KEYBOARD SHORTCUTS:
-//   F1  - Toggle Control Panel on/off
+//   F2  - Toggle Control Panel on/off
 //   ESC - Close Control Panel (when open)
 //
 // FIVEM INTEGRATION:
 //   From your FiveM client script, you can control the panel:
-//   SendNUIMessage({ type = "toggleControlPanel" })  -- Toggle control panel (same as F1)
+//   SendNUIMessage({ type = "toggleControlPanel" })  -- Toggle control panel (same as F2)
 //   SendNUIMessage({ type = "showControlPanel" })    -- Force show control panel
 //   SendNUIMessage({ type = "hideControlPanel" })    -- Force hide control panel
 //
