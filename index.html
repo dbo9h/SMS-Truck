@@ -271,7 +271,8 @@
             padding-bottom: 10px;
         }
         
-        #settings-panel { 
+        #settings-panel,
+        #trucking-settings-panel { 
             display: none; 
             position: absolute; 
             top: 50px; 
@@ -280,11 +281,18 @@
             border: var(--border); 
             border-radius: 8px; 
             padding: 15px; 
-            min-width: 280px; 
+            min-width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
             box-shadow: 0 4px 15px rgba(0,0,0,0.8); 
             z-index: 1000; 
         }
-        #settings-panel.show { display: block; }
+        #settings-panel.show,
+        #trucking-settings-panel.show { display: block; }
+        
+        #trucking-settings-panel {
+            border-color: #cc5500;
+        }
         
         #minimized-bar {
             display: none;
@@ -546,7 +554,7 @@
 
     <header id="trucking-drag-handle">
         <div class="header-controls">
-            <span class="settings-icon" onclick="toggleSettings()">⚙️</span>
+            <span class="settings-icon" onclick="toggleTruckingSettings()">⚙️</span>
         </div>
         
         <div class="header-title">Trucking Tracker</div>
@@ -724,46 +732,104 @@
 </div>
 
 <div id="settings-panel">
-    <div style="font-size:1.1em; font-weight:bold; margin-bottom:15px; color:var(--primary); text-transform:uppercase; letter-spacing:1px;">Settings</div>
+    <div style="font-size:1.1em; font-weight:bold; margin-bottom:15px; color:var(--primary); text-transform:uppercase; letter-spacing:1px;">Quick Settings</div>
     
-    <div class="settings-row">
-        <div class="settings-label">Show Destination</div>
-        <div class="settings-control">
-            <input type="checkbox" id="show-destination" checked onchange="toggleDestination()">
+    <div style="font-size:0.75em; color:var(--text-dim); margin-bottom:10px; font-style:italic;">
+        💡 Use F2 for full control panel
+    </div>
+    
+    <div style="border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:10px; padding-bottom:10px;">
+        <div style="font-size:0.85em; color:var(--primary); font-weight:bold; margin-bottom:8px;">📦 CARGO SETTINGS</div>
+        
+        <div class="settings-row" style="border-bottom:none; margin-bottom:5px; padding-bottom:5px;">
+            <div class="settings-label">Show Destination</div>
+            <div class="settings-control">
+                <input type="checkbox" id="show-destination" checked onchange="toggleDestination()">
+            </div>
+        </div>
+        
+        <div class="settings-row" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+            <div class="settings-label">Show Calculator</div>
+            <div class="settings-control">
+                <input type="checkbox" id="show-calculator" checked onchange="toggleCalculator()">
+            </div>
         </div>
     </div>
     
-    <div class="settings-row">
-        <div class="settings-label">Show Calculator</div>
-        <div class="settings-control">
-            <input type="checkbox" id="show-calculator" checked onchange="toggleCalculator()">
+    <div style="border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:10px; padding-bottom:10px;">
+        <div style="font-size:0.85em; color:var(--primary); font-weight:bold; margin-bottom:8px;">⚙️ GLOBAL SETTINGS</div>
+        
+        <div class="settings-row" style="border-bottom:none; margin-bottom:5px; padding-bottom:5px;">
+            <div class="settings-label">Font Size</div>
+            <div class="settings-control">
+                <button class="font-btn" onclick="changeFontSize(-1)">−</button>
+                <span class="font-value" id="font-size-display">100%</span>
+                <button class="font-btn" onclick="changeFontSize(1)">+</button>
+            </div>
+        </div>
+        
+        <div class="settings-row" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+            <div class="settings-label">Opacity</div>
+            <div class="settings-control">
+                <input type="range" class="opacity-slider" id="opacity-slider" min="50" max="100" value="95" oninput="changeOpacity(this.value)">
+                <span class="font-value" id="opacity-display">95%</span>
+            </div>
         </div>
     </div>
     
-    <div class="settings-row">
-        <div class="settings-label">Font Size</div>
-        <div class="settings-control">
-            <button class="font-btn" onclick="changeFontSize(-1)">−</button>
-            <span class="font-value" id="font-size-display">100%</span>
-            <button class="font-btn" onclick="changeFontSize(1)">+</button>
-        </div>
-    </div>
-    
-    <div class="settings-row">
-        <div class="settings-label">Opacity</div>
-        <div class="settings-control">
-            <input type="range" class="opacity-slider" id="opacity-slider" min="50" max="100" value="95" oninput="changeOpacity(this.value)">
-            <span class="font-value" id="opacity-display">95%</span>
-        </div>
-    </div>
-    
-    <div class="settings-row">
+    <div class="settings-row" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
         <div class="settings-label">Reset All</div>
         <div class="settings-control">
             <button class="font-btn" onclick="resetSettings()">Reset</button>
         </div>
     </div>
 </div>
+
+<div id="trucking-settings-panel">
+    <div style="font-size:1.1em; font-weight:bold; margin-bottom:15px; color:#cc5500; text-transform:uppercase; letter-spacing:1px;">🚛 Trucking Settings</div>
+    
+    <div style="font-size:0.75em; color:var(--text-dim); margin-bottom:10px; font-style:italic;">
+        💡 Use F2 for full control panel
+    </div>
+    
+    <div style="border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:10px; padding-bottom:10px;">
+        <div style="font-size:0.85em; color:#cc5500; font-weight:bold; margin-bottom:8px;">🚛 TRUCKING SETTINGS</div>
+        
+        <div style="font-size:0.8em; color:var(--text-dim); font-style:italic; padding:10px; background:rgba(255,255,255,0.02); border-radius:4px;">
+            Trucking tracker has no specific toggles.
+            Use F2 control panel to show/hide this tracker.
+        </div>
+    </div>
+    
+    <div style="border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:10px; padding-bottom:10px;">
+        <div style="font-size:0.85em; color:#cc5500; font-weight:bold; margin-bottom:8px;">⚙️ GLOBAL SETTINGS</div>
+        
+        <div class="settings-row" style="border-bottom:none; margin-bottom:5px; padding-bottom:5px;">
+            <div class="settings-label">Font Size</div>
+            <div class="settings-control">
+                <button class="font-btn" onclick="changeFontSize(-1)">−</button>
+                <span class="font-value" id="trucking-font-size-display">100%</span>
+                <button class="font-btn" onclick="changeFontSize(1)">+</button>
+            </div>
+        </div>
+        
+        <div class="settings-row" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+            <div class="settings-label">Opacity</div>
+            <div class="settings-control">
+                <input type="range" class="opacity-slider" id="trucking-opacity-slider" min="50" max="100" value="95" oninput="changeOpacity(this.value)">
+                <span class="font-value" id="trucking-opacity-display">95%</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="settings-row" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+        <div class="settings-label">Reset All</div>
+        <div class="settings-control">
+            <button class="font-btn" onclick="resetSettings()">Reset</button>
+        </div>
+    </div>
+</div>
+
 <div id="job-list" style="display:none;"></div>
 <table id="summary-table" style="display:none;"></table>
 
@@ -856,19 +922,25 @@ if (savedFontSize) {
     document.getElementById('content').style.fontSize = savedFontSize + '%';
     document.getElementById('trucking-content').style.fontSize = savedFontSize + '%';
     document.getElementById('font-size-display').innerText = savedFontSize + '%';
+    document.getElementById('trucking-font-size-display').innerText = savedFontSize + '%';
 } else {
     document.getElementById('font-size-display').innerText = '100%';
+    document.getElementById('trucking-font-size-display').innerText = '100%';
 }
 
 const savedOpacity = localStorage.getItem(STORAGE_KEY_OPACITY);
 if (savedOpacity) {
     document.getElementById('tracker-app').style.opacity = savedOpacity / 100;
+    document.getElementById('trucking-tracker-app').style.opacity = savedOpacity / 100;
     document.getElementById('opacity-slider').value = savedOpacity;
     document.getElementById('opacity-display').innerText = savedOpacity + '%';
+    document.getElementById('trucking-opacity-slider').value = savedOpacity;
+    document.getElementById('trucking-opacity-display').innerText = savedOpacity + '%';
     document.getElementById('control-opacity-slider').value = savedOpacity;
     document.getElementById('control-opacity-display').innerText = savedOpacity + '%';
 } else {
     document.getElementById('opacity-display').innerText = '95%';
+    document.getElementById('trucking-opacity-display').innerText = '95%';
     document.getElementById('control-opacity-display').innerText = '95%';
 }
 
@@ -941,13 +1013,35 @@ function toggleMiniTrucking() {
 
 function toggleSettings() {
     const panel = document.getElementById('settings-panel');
+    const truckingPanel = document.getElementById('trucking-settings-panel');
+    
+    // Close trucking panel if open
+    if (truckingPanel.classList.contains('show')) {
+        truckingPanel.classList.remove('show');
+    }
+    
+    // Toggle cargo panel
     panel.classList.toggle('show');
+}
+
+function toggleTruckingSettings() {
+    const panel = document.getElementById('settings-panel');
+    const truckingPanel = document.getElementById('trucking-settings-panel');
+    
+    // Close cargo panel if open
+    if (panel.classList.contains('show')) {
+        panel.classList.remove('show');
+    }
+    
+    // Toggle trucking panel
+    truckingPanel.classList.toggle('show');
 }
 
 function changeFontSize(delta) {
     const content = document.getElementById('content');
     const truckingContent = document.getElementById('trucking-content');
     const display = document.getElementById('font-size-display');
+    const truckingDisplay = document.getElementById('trucking-font-size-display');
     const controlDisplay = document.getElementById('control-font-size-display');
     let current = parseInt(localStorage.getItem(STORAGE_KEY_FONTSIZE) || '100');
     current += (delta * 10);
@@ -955,6 +1049,7 @@ function changeFontSize(delta) {
     content.style.fontSize = current + '%';
     if (truckingContent) truckingContent.style.fontSize = current + '%';
     display.innerText = current + '%';
+    if (truckingDisplay) truckingDisplay.innerText = current + '%';
     controlDisplay.innerText = current + '%';
     localStorage.setItem(STORAGE_KEY_FONTSIZE, current);
 }
@@ -969,14 +1064,23 @@ function resetFontSize() {
 
 function changeOpacity(value) {
     const app = document.getElementById('tracker-app');
+    const truckingApp = document.getElementById('trucking-tracker-app');
     const display = document.getElementById('opacity-display');
+    const truckingDisplay = document.getElementById('trucking-opacity-display');
     const controlDisplay = document.getElementById('control-opacity-display');
+    
     app.style.opacity = value / 100;
+    if (truckingApp) truckingApp.style.opacity = value / 100;
+    
     display.innerText = value + '%';
+    if (truckingDisplay) truckingDisplay.innerText = value + '%';
     controlDisplay.innerText = value + '%';
     
-    // Sync both sliders
+    // Sync all sliders
     document.getElementById('opacity-slider').value = value;
+    if (document.getElementById('trucking-opacity-slider')) {
+        document.getElementById('trucking-opacity-slider').value = value;
+    }
     document.getElementById('control-opacity-slider').value = value;
     
     localStorage.setItem(STORAGE_KEY_OPACITY, value);
@@ -1007,6 +1111,7 @@ function resetSettings() {
     content.style.fontSize = '100%';
     if (truckingContent) truckingContent.style.fontSize = '100%';
     document.getElementById('font-size-display').innerText = '100%';
+    document.getElementById('trucking-font-size-display').innerText = '100%';
     document.getElementById('control-font-size-display').innerText = '100%';
     localStorage.setItem(STORAGE_KEY_FONTSIZE, '100');
     
@@ -1850,12 +1955,24 @@ function stopResizeTrucking() {
     window.removeEventListener('mouseup', stopResizeTrucking);
 }
 
-// Close settings panel when clicking outside
+// Close settings panels when clicking outside
 document.addEventListener('click', (e) => {
     const panel = document.getElementById('settings-panel');
-    const settingsIcon = document.querySelector('.settings-icon');
-    if (panel.classList.contains('show') && !panel.contains(e.target) && e.target !== settingsIcon) {
-        panel.classList.remove('show');
+    const truckingPanel = document.getElementById('trucking-settings-panel');
+    const settingsIcons = document.querySelectorAll('.settings-icon');
+    
+    let clickedSettingsIcon = false;
+    settingsIcons.forEach(icon => {
+        if (e.target === icon) clickedSettingsIcon = true;
+    });
+    
+    if (!clickedSettingsIcon) {
+        if (panel.classList.contains('show') && !panel.contains(e.target)) {
+            panel.classList.remove('show');
+        }
+        if (truckingPanel.classList.contains('show') && !truckingPanel.contains(e.target)) {
+            truckingPanel.classList.remove('show');
+        }
     }
 });
 
