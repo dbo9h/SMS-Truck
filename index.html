@@ -212,6 +212,46 @@
 
         #job-list, #summary-table { display: none !important; }
         
+        #control-panel { 
+            display: none; 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%);
+            background: var(--bg-glass); 
+            border: var(--border); 
+            border-radius: 12px; 
+            padding: 25px; 
+            min-width: 400px;
+            max-width: 500px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.9); 
+            z-index: 2000;
+            backdrop-filter: blur(10px);
+        }
+        #control-panel.show { display: block; }
+        
+        #control-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1999;
+        }
+        #control-overlay.show { display: block; }
+        
+        .control-header {
+            font-size: 1.4em;
+            font-weight: 900;
+            margin-bottom: 20px;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+            font-family: 'Rajdhani', sans-serif;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+        }
+        
         #settings-panel { 
             display: none; 
             position: absolute; 
@@ -221,20 +261,56 @@
             border: var(--border); 
             border-radius: 8px; 
             padding: 15px; 
-            min-width: 250px; 
+            min-width: 280px; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.8); 
             z-index: 1000; 
         }
         #settings-panel.show { display: block; }
+        
+        #minimized-bar {
+            display: none;
+            position: absolute;
+            top: 20px;
+            left: 2vw;
+            background: var(--bg-glass);
+            border: var(--border);
+            border-radius: 8px;
+            padding: 8px 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            z-index: 999;
+        }
+        #minimized-bar:hover { border-color: var(--primary); }
+        #minimized-bar.show { display: block; }
         .settings-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .settings-row:last-child { border-bottom: none; margin-bottom: 0; }
         .settings-label { font-size: 0.85em; color: var(--text-dim); }
         .settings-control { display: flex; gap: 5px; align-items: center; }
+        
+        .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
+        .control-row:hover { background: rgba(255,255,255,0.05); border-color: var(--primary); }
+        .control-label { font-size: 0.95em; color: var(--text-main); font-weight: 500; }
+        .control-toggle { display: flex; gap: 8px; align-items: center; }
         .font-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #ccc; padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8em; }
         .font-btn:hover { background: var(--primary); color: white; }
         .font-value { color: var(--primary); font-weight: bold; min-width: 35px; text-align: center; }
         .settings-icon { cursor: pointer; font-size: 1em; color: #ccc; }
         .settings-icon:hover { color: #fff; }
+        
+        .opacity-slider { width: 120px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; appearance: none; cursor: pointer; }
+        .opacity-slider::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; background: var(--primary); border-radius: 50%; cursor: pointer; }
+        .opacity-slider::-moz-range-thumb { width: 12px; height: 12px; background: var(--primary); border-radius: 50%; cursor: pointer; border: none; }
+        
+        .minimize-btn { cursor: pointer; font-size: 1em; color: #ccc; margin-left: 5px; }
+        .minimize-btn:hover { color: #fff; }
+        
+        #settings-panel input[type="checkbox"],
+        #control-panel input[type="checkbox"] { 
+            width: 18px; 
+            height: 18px; 
+            cursor: pointer; 
+            accent-color: var(--primary); 
+        }
     </style>
 </head>
 <body>
@@ -299,7 +375,8 @@
             <div class="drop-group drop-5"><div class="parachute">🪂</div><div class="crate">📦</div></div>
         </div>
 
-        <div class="header-controls" style="flex-direction:column; gap:2px; align-items:flex-end;">
+        <div class="header-controls" style="flex-direction:row; gap:6px; align-items:center;">
+            <span class="minimize-btn" onclick="minimizeUI()" title="Minimize">−</span>
             <button id="mini-btn" onclick="toggleMini()">MINI</button>
             <span id="clock">00:00</span>
         </div>
@@ -307,7 +384,7 @@
 
     <div id="content">
         
-        <div class="destination-display" id="dest-box">
+        <div class="destination-display" id="dest-box" data-visible="true">
             <div class="dest-label">Next Destination</div>
             <div class="dest-value" id="disp-destination">Waiting for cargo...</div>
             <div id="multi-warning" class="multi-warning">⚠ Multiple Cargo Types ⚠</div>
@@ -378,9 +455,9 @@
                 <div class="value" id="trunk-capacity" style="font-size:0.85em;">0/0kg</div>
             </div>
 
-            <div class="stat-separator"></div>
+            <div class="stat-separator" id="calc-sep-1" data-visible="true"></div>
 
-            <div class="stat-item" style="min-width:180px;">
+            <div class="stat-item" id="calc-input-section" style="min-width:180px;" data-visible="true">
                 <div class="label">Flight Calculator</div>
                 <div style="display:flex; gap:3px; align-items:center;">
                     <input type="number" id="target-input" placeholder="Target XP" style="width:100px; margin:0;">
@@ -389,9 +466,9 @@
                 </div>
             </div>
 
-            <div class="stat-separator"></div>
+            <div class="stat-separator" id="calc-sep-2" data-visible="true"></div>
 
-            <div class="stat-item">
+            <div class="stat-item" id="calc-result-section" data-visible="true">
                 <div class="label">Flights Left</div>
                 <div class="value" id="calc-result">--</div>
             </div>
@@ -403,8 +480,80 @@
     <div id="resize-handle" style="position:absolute; bottom:0; right:0; width:15px; height:15px; cursor:nwse-resize;"></div>
 </div>
 
+<div id="minimized-bar" onclick="restoreUI()">
+    <span style="font-family:'Rajdhani',sans-serif; font-weight:700; color:var(--primary); font-size:0.9em;">ZG OPS</span>
+    <span style="color:#888; font-size:0.8em; margin-left:10px;">Click to restore</span>
+</div>
+
+<div id="control-overlay"></div>
+
+<div id="control-panel">
+    <div class="control-header">⚙️ ZG OPS Control Panel</div>
+    
+    <div class="control-row">
+        <div class="control-label">🖥️ Show Main Tracker UI</div>
+        <div class="control-toggle">
+            <input type="checkbox" id="control-show-tracker" checked onchange="toggleTrackerUI()">
+        </div>
+    </div>
+    
+    <div class="control-row">
+        <div class="control-label">📍 Show Destination Display</div>
+        <div class="control-toggle">
+            <input type="checkbox" id="control-show-destination" checked onchange="toggleDestinationFromControl()">
+        </div>
+    </div>
+    
+    <div class="control-row">
+        <div class="control-label">🧮 Show Flight Calculator</div>
+        <div class="control-toggle">
+            <input type="checkbox" id="control-show-calculator" checked onchange="toggleCalculatorFromControl()">
+        </div>
+    </div>
+    
+    <div class="control-row">
+        <div class="control-label">📏 Font Size</div>
+        <div class="control-toggle">
+            <button class="font-btn" onclick="changeFontSize(-1)">−</button>
+            <span class="font-value" id="control-font-size-display">100%</span>
+            <button class="font-btn" onclick="changeFontSize(1)">+</button>
+        </div>
+    </div>
+    
+    <div class="control-row">
+        <div class="control-label">👁️ Opacity</div>
+        <div class="control-toggle">
+            <input type="range" class="opacity-slider" id="control-opacity-slider" min="50" max="100" value="95" oninput="changeOpacity(this.value)">
+            <span class="font-value" id="control-opacity-display">95%</span>
+        </div>
+    </div>
+    
+    <div style="display:flex; gap:10px; margin-top:20px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.1);">
+        <button class="font-btn" onclick="resetSettings()" style="flex:1;">Reset All Settings</button>
+        <button class="font-btn" onclick="toggleControlPanel()" style="flex:1; background:var(--primary); color:white;">Close (F1)</button>
+    </div>
+    
+    <div style="text-align:center; margin-top:15px; font-size:0.75em; color:var(--text-dim);">
+        Press <span style="color:var(--primary); font-weight:bold;">F1</span> to toggle this panel
+    </div>
+</div>
+
 <div id="settings-panel">
     <div style="font-size:1.1em; font-weight:bold; margin-bottom:15px; color:var(--primary); text-transform:uppercase; letter-spacing:1px;">Settings</div>
+    
+    <div class="settings-row">
+        <div class="settings-label">Show Destination</div>
+        <div class="settings-control">
+            <input type="checkbox" id="show-destination" checked onchange="toggleDestination()">
+        </div>
+    </div>
+    
+    <div class="settings-row">
+        <div class="settings-label">Show Calculator</div>
+        <div class="settings-control">
+            <input type="checkbox" id="show-calculator" checked onchange="toggleCalculator()">
+        </div>
+    </div>
     
     <div class="settings-row">
         <div class="settings-label">Font Size</div>
@@ -416,9 +565,17 @@
     </div>
     
     <div class="settings-row">
-        <div class="settings-label">Reset Font</div>
+        <div class="settings-label">Opacity</div>
         <div class="settings-control">
-            <button class="font-btn" onclick="resetFontSize()">Reset</button>
+            <input type="range" class="opacity-slider" id="opacity-slider" min="50" max="100" value="95" oninput="changeOpacity(this.value)">
+            <span class="font-value" id="opacity-display">95%</span>
+        </div>
+    </div>
+    
+    <div class="settings-row">
+        <div class="settings-label">Reset All</div>
+        <div class="settings-control">
+            <button class="font-btn" onclick="resetSettings()">Reset</button>
         </div>
     </div>
 </div>
@@ -442,6 +599,13 @@ let LAST_VEHICLE = null;
 const STORAGE_KEY_CALC = "target_xp_cargo";
 const STORAGE_KEY_MINI = "mini_mode_cargo";
 const STORAGE_KEY_FONTSIZE = "font_size_cargo";
+const STORAGE_KEY_OPACITY = "opacity_cargo";
+const STORAGE_KEY_SHOW_DEST = "show_destination_cargo";
+const STORAGE_KEY_SHOW_CALC = "show_calculator_cargo";
+const STORAGE_KEY_SHOW_TRACKER = "show_tracker_cargo";
+
+let APP_VISIBLE = true;
+let CONTROL_PANEL_VISIBLE = false;
 
 let MEMORY = {
     inventory: {},
@@ -481,6 +645,50 @@ if (savedFontSize) {
     document.getElementById('font-size-display').innerText = '100%';
 }
 
+const savedOpacity = localStorage.getItem(STORAGE_KEY_OPACITY);
+if (savedOpacity) {
+    document.getElementById('tracker-app').style.opacity = savedOpacity / 100;
+    document.getElementById('opacity-slider').value = savedOpacity;
+    document.getElementById('opacity-display').innerText = savedOpacity + '%';
+    document.getElementById('control-opacity-slider').value = savedOpacity;
+    document.getElementById('control-opacity-display').innerText = savedOpacity + '%';
+} else {
+    document.getElementById('opacity-display').innerText = '95%';
+    document.getElementById('control-opacity-display').innerText = '95%';
+}
+
+const savedShowDest = localStorage.getItem(STORAGE_KEY_SHOW_DEST);
+if (savedShowDest === 'false') {
+    document.getElementById('show-destination').checked = false;
+    document.getElementById('control-show-destination').checked = false;
+    toggleDestination();
+} else {
+    document.getElementById('show-destination').checked = true;
+    document.getElementById('control-show-destination').checked = true;
+}
+
+const savedShowCalc = localStorage.getItem(STORAGE_KEY_SHOW_CALC);
+if (savedShowCalc === 'false') {
+    document.getElementById('show-calculator').checked = false;
+    document.getElementById('control-show-calculator').checked = false;
+    toggleCalculator();
+} else {
+    document.getElementById('show-calculator').checked = true;
+    document.getElementById('control-show-calculator').checked = true;
+}
+
+const savedShowTracker = localStorage.getItem(STORAGE_KEY_SHOW_TRACKER);
+if (savedShowTracker === 'false') {
+    document.getElementById('control-show-tracker').checked = false;
+    document.getElementById('tracker-app').style.display = 'none';
+    APP_VISIBLE = false;
+} else {
+    document.getElementById('control-show-tracker').checked = true;
+}
+
+// Sync control panel font size display
+document.getElementById('control-font-size-display').innerText = document.getElementById('font-size-display').innerText;
+
 function toggleMini() {
     const app = document.getElementById('tracker-app');
     app.classList.toggle('mini-mode');
@@ -497,11 +705,13 @@ function toggleSettings() {
 function changeFontSize(delta) {
     const content = document.getElementById('content');
     const display = document.getElementById('font-size-display');
+    const controlDisplay = document.getElementById('control-font-size-display');
     let current = parseInt(localStorage.getItem(STORAGE_KEY_FONTSIZE) || '100');
     current += (delta * 10);
     current = Math.max(60, Math.min(200, current));
     content.style.fontSize = current + '%';
     display.innerText = current + '%';
+    controlDisplay.innerText = current + '%';
     localStorage.setItem(STORAGE_KEY_FONTSIZE, current);
 }
 
@@ -511,6 +721,153 @@ function resetFontSize() {
     content.style.fontSize = '100%';
     display.innerText = '100%';
     localStorage.setItem(STORAGE_KEY_FONTSIZE, '100');
+}
+
+function changeOpacity(value) {
+    const app = document.getElementById('tracker-app');
+    const display = document.getElementById('opacity-display');
+    const controlDisplay = document.getElementById('control-opacity-display');
+    app.style.opacity = value / 100;
+    display.innerText = value + '%';
+    controlDisplay.innerText = value + '%';
+    
+    // Sync both sliders
+    document.getElementById('opacity-slider').value = value;
+    document.getElementById('control-opacity-slider').value = value;
+    
+    localStorage.setItem(STORAGE_KEY_OPACITY, value);
+}
+
+function minimizeUI() {
+    document.getElementById('tracker-app').style.display = 'none';
+    document.getElementById('minimized-bar').classList.add('show');
+}
+
+function restoreUI() {
+    document.getElementById('tracker-app').style.display = 'flex';
+    document.getElementById('minimized-bar').classList.remove('show');
+}
+
+function resetSettings() {
+    // Reset font size
+    const content = document.getElementById('content');
+    content.style.fontSize = '100%';
+    document.getElementById('font-size-display').innerText = '100%';
+    document.getElementById('control-font-size-display').innerText = '100%';
+    localStorage.setItem(STORAGE_KEY_FONTSIZE, '100');
+    
+    // Reset opacity
+    changeOpacity(95);
+    
+    // Reset destination display
+    document.getElementById('show-destination').checked = true;
+    document.getElementById('control-show-destination').checked = true;
+    localStorage.setItem(STORAGE_KEY_SHOW_DEST, 'true');
+    document.getElementById('dest-box').style.display = 'flex';
+    document.getElementById('dest-box').setAttribute('data-visible', 'true');
+    
+    // Reset calculator
+    document.getElementById('show-calculator').checked = true;
+    document.getElementById('control-show-calculator').checked = true;
+    localStorage.setItem(STORAGE_KEY_SHOW_CALC, 'true');
+    const calcElements = ['calc-sep-1', 'calc-input-section', 'calc-sep-2', 'calc-result-section'];
+    calcElements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.display = el.classList.contains('stat-separator') ? 'block' : 'flex';
+            el.setAttribute('data-visible', 'true');
+        }
+    });
+    
+    // Reset tracker visibility
+    document.getElementById('control-show-tracker').checked = true;
+    localStorage.setItem(STORAGE_KEY_SHOW_TRACKER, 'true');
+    document.getElementById('tracker-app').style.display = 'flex';
+    document.getElementById('minimized-bar').classList.remove('show');
+    APP_VISIBLE = true;
+}
+
+function toggleDestination() {
+    const checked = document.getElementById('show-destination').checked;
+    const destBox = document.getElementById('dest-box');
+    if (checked) {
+        destBox.style.display = 'flex';
+        destBox.setAttribute('data-visible', 'true');
+    } else {
+        destBox.style.display = 'none';
+        destBox.setAttribute('data-visible', 'false');
+    }
+    // Sync with control panel
+    document.getElementById('control-show-destination').checked = checked;
+    localStorage.setItem(STORAGE_KEY_SHOW_DEST, checked);
+}
+
+function toggleCalculator() {
+    const checked = document.getElementById('show-calculator').checked;
+    const elements = [
+        'calc-sep-1', 'calc-input-section', 'calc-sep-2', 'calc-result-section'
+    ];
+    elements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            if (checked) {
+                el.style.display = el.classList.contains('stat-separator') ? 'block' : 'flex';
+                el.setAttribute('data-visible', 'true');
+            } else {
+                el.style.display = 'none';
+                el.setAttribute('data-visible', 'false');
+            }
+        }
+    });
+    // Sync with control panel
+    document.getElementById('control-show-calculator').checked = checked;
+    localStorage.setItem(STORAGE_KEY_SHOW_CALC, checked);
+}
+
+function toggleDestinationFromControl() {
+    document.getElementById('show-destination').checked = document.getElementById('control-show-destination').checked;
+    toggleDestination();
+}
+
+function toggleCalculatorFromControl() {
+    document.getElementById('show-calculator').checked = document.getElementById('control-show-calculator').checked;
+    toggleCalculator();
+}
+
+function toggleTrackerUI() {
+    const checked = document.getElementById('control-show-tracker').checked;
+    const app = document.getElementById('tracker-app');
+    const miniBar = document.getElementById('minimized-bar');
+    
+    if (checked) {
+        app.style.display = 'flex';
+        miniBar.classList.remove('show');
+        APP_VISIBLE = true;
+    } else {
+        app.style.display = 'none';
+        miniBar.classList.remove('show');
+        APP_VISIBLE = false;
+    }
+    localStorage.setItem(STORAGE_KEY_SHOW_TRACKER, checked);
+}
+
+function toggleControlPanel() {
+    const panel = document.getElementById('control-panel');
+    const overlay = document.getElementById('control-overlay');
+    
+    CONTROL_PANEL_VISIBLE = !CONTROL_PANEL_VISIBLE;
+    
+    if (CONTROL_PANEL_VISIBLE) {
+        panel.classList.add('show');
+        overlay.classList.add('show');
+    } else {
+        panel.classList.remove('show');
+        overlay.classList.remove('show');
+    }
+}
+
+function toggleAppVisibility() {
+    toggleControlPanel();
 }
 
 // --- CLOCK ---
@@ -917,6 +1274,71 @@ document.addEventListener('click', (e) => {
     const settingsIcon = document.querySelector('.settings-icon');
     if (panel.classList.contains('show') && !panel.contains(e.target) && e.target !== settingsIcon) {
         panel.classList.remove('show');
+    }
+});
+
+// Close control panel when clicking overlay
+document.getElementById('control-overlay').addEventListener('click', () => {
+    toggleControlPanel();
+});
+
+// F1 Key Listener (Toggle Control Panel)
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'F1') {
+        e.preventDefault();
+        toggleControlPanel();
+    }
+    
+    // ESC to close control panel
+    if (e.key === 'Escape' && CONTROL_PANEL_VISIBLE) {
+        e.preventDefault();
+        toggleControlPanel();
+    }
+});
+
+// =================================================================
+// CONTROL PANEL SYSTEM - FiveM Integration
+// =================================================================
+// The Control Panel is the main settings interface that appears when F1 is pressed
+// It allows users to show/hide the main tracker UI and configure all settings
+//
+// KEYBOARD SHORTCUTS:
+//   F1  - Toggle Control Panel on/off
+//   ESC - Close Control Panel (when open)
+//
+// FIVEM INTEGRATION:
+//   From your FiveM client script, you can control the panel:
+//   SendNUIMessage({ type = "toggleControlPanel" })  -- Toggle control panel (same as F1)
+//   SendNUIMessage({ type = "showControlPanel" })    -- Force show control panel
+//   SendNUIMessage({ type = "hideControlPanel" })    -- Force hide control panel
+//
+// FEATURES:
+//   - Show/Hide Main Tracker UI
+//   - Show/Hide Destination Display
+//   - Show/Hide Flight Calculator
+//   - Adjust Font Size
+//   - Adjust Opacity
+//   - Reset All Settings
+// =================================================================
+window.addEventListener('message', (event) => {
+    const data = event.data;
+    
+    // Check if message is from FiveM
+    if (data && data.type === 'toggleControlPanel') {
+        toggleControlPanel();
+    }
+    
+    // Handle show/hide control panel commands
+    if (data && data.type === 'showControlPanel') {
+        if (!CONTROL_PANEL_VISIBLE) {
+            toggleControlPanel();
+        }
+    }
+    
+    if (data && data.type === 'hideControlPanel') {
+        if (CONTROL_PANEL_VISIBLE) {
+            toggleControlPanel();
+        }
     }
 });
 </script>
