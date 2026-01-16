@@ -690,34 +690,62 @@
         </div>
     </div>
     
+    <div style="font-size:0.9em; color:var(--primary); font-weight:bold; margin:15px 0 10px 0; padding-bottom:5px; border-bottom:1px solid rgba(255,255,255,0.1);">📦 CARGO TRACKER</div>
+    
     <div class="control-row">
-        <div class="control-label">📍 Show Destination Display</div>
+        <div class="control-label">Show Destination</div>
         <div class="control-toggle">
             <input type="checkbox" id="control-show-destination" checked onchange="toggleDestinationFromControl()">
         </div>
     </div>
     
     <div class="control-row">
-        <div class="control-label">🧮 Show Flight Calculator</div>
+        <div class="control-label">Show Calculator</div>
         <div class="control-toggle">
             <input type="checkbox" id="control-show-calculator" checked onchange="toggleCalculatorFromControl()">
         </div>
     </div>
     
     <div class="control-row">
-        <div class="control-label">📏 Font Size</div>
+        <div class="control-label">Font Size</div>
         <div class="control-toggle">
-            <button class="font-btn" onclick="changeFontSize(-1)">−</button>
+            <button class="font-btn" onclick="changeCargoFontSize(-1)">−</button>
             <span class="font-value" id="control-font-size-display">100%</span>
-            <button class="font-btn" onclick="changeFontSize(1)">+</button>
+            <button class="font-btn" onclick="changeCargoFontSize(1)">+</button>
         </div>
     </div>
     
     <div class="control-row">
-        <div class="control-label">👁️ Opacity</div>
+        <div class="control-label">Opacity</div>
         <div class="control-toggle">
-            <input type="range" class="opacity-slider" id="control-opacity-slider" min="50" max="100" value="95" oninput="changeOpacity(this.value)">
+            <input type="range" class="opacity-slider" id="control-opacity-slider" min="50" max="100" value="95" oninput="changeCargoOpacity(this.value)">
             <span class="font-value" id="control-opacity-display">95%</span>
+        </div>
+    </div>
+    
+    <div style="font-size:0.9em; color:#cc5500; font-weight:bold; margin:15px 0 10px 0; padding-bottom:5px; border-bottom:1px solid rgba(255,255,255,0.1);">🚛 TRUCKING TRACKER</div>
+    
+    <div class="control-row">
+        <div class="control-label">Show Calculator</div>
+        <div class="control-toggle">
+            <input type="checkbox" id="control-show-trucking-calculator" checked onchange="toggleTruckingCalculatorFromControl()">
+        </div>
+    </div>
+    
+    <div class="control-row">
+        <div class="control-label">Font Size</div>
+        <div class="control-toggle">
+            <button class="font-btn" onclick="changeTruckingFontSize(-1)">−</button>
+            <span class="font-value" id="control-trucking-font-size">100%</span>
+            <button class="font-btn" onclick="changeTruckingFontSize(1)">+</button>
+        </div>
+    </div>
+    
+    <div class="control-row">
+        <div class="control-label">Opacity</div>
+        <div class="control-toggle">
+            <input type="range" class="opacity-slider" id="control-trucking-opacity" min="50" max="100" value="95" oninput="changeTruckingOpacity(this.value)">
+            <span class="font-value" id="control-trucking-opacity-display">95%</span>
         </div>
     </div>
     
@@ -748,39 +776,35 @@
             </div>
         </div>
         
-        <div class="settings-row" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
+        <div class="settings-row" style="border-bottom:none; margin-bottom:5px; padding-bottom:5px;">
             <div class="settings-label">Show Calculator</div>
             <div class="settings-control">
                 <input type="checkbox" id="show-calculator" checked onchange="toggleCalculator()">
             </div>
         </div>
-    </div>
-    
-    <div style="border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:10px; padding-bottom:10px;">
-        <div style="font-size:0.85em; color:var(--primary); font-weight:bold; margin-bottom:8px;">⚙️ GLOBAL SETTINGS</div>
         
         <div class="settings-row" style="border-bottom:none; margin-bottom:5px; padding-bottom:5px;">
             <div class="settings-label">Font Size</div>
             <div class="settings-control">
-                <button class="font-btn" onclick="changeFontSize(-1)">−</button>
+                <button class="font-btn" onclick="changeCargoFontSize(-1)">−</button>
                 <span class="font-value" id="font-size-display">100%</span>
-                <button class="font-btn" onclick="changeFontSize(1)">+</button>
+                <button class="font-btn" onclick="changeCargoFontSize(1)">+</button>
             </div>
         </div>
         
         <div class="settings-row" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
             <div class="settings-label">Opacity</div>
             <div class="settings-control">
-                <input type="range" class="opacity-slider" id="opacity-slider" min="50" max="100" value="95" oninput="changeOpacity(this.value)">
+                <input type="range" class="opacity-slider" id="opacity-slider" min="50" max="100" value="95" oninput="changeCargoOpacity(this.value)">
                 <span class="font-value" id="opacity-display">95%</span>
             </div>
         </div>
     </div>
     
     <div class="settings-row" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
-        <div class="settings-label">Reset All</div>
+        <div class="settings-label">Reset Cargo Settings</div>
         <div class="settings-control">
-            <button class="font-btn" onclick="resetSettings()">Reset</button>
+            <button class="font-btn" onclick="resetCargoSettings()">Reset</button>
         </div>
     </div>
 </div>
@@ -795,37 +819,35 @@
     <div style="border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:10px; padding-bottom:10px;">
         <div style="font-size:0.85em; color:#cc5500; font-weight:bold; margin-bottom:8px;">🚛 TRUCKING SETTINGS</div>
         
-        <div style="font-size:0.8em; color:var(--text-dim); font-style:italic; padding:10px; background:rgba(255,255,255,0.02); border-radius:4px;">
-            Trucking tracker has no specific toggles.
-            Use F2 control panel to show/hide this tracker.
+        <div class="settings-row" style="border-bottom:none; margin-bottom:5px; padding-bottom:5px;">
+            <div class="settings-label">Show Calculator</div>
+            <div class="settings-control">
+                <input type="checkbox" id="show-trucking-calculator" checked onchange="toggleTruckingCalculator()">
+            </div>
         </div>
-    </div>
-    
-    <div style="border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:10px; padding-bottom:10px;">
-        <div style="font-size:0.85em; color:#cc5500; font-weight:bold; margin-bottom:8px;">⚙️ GLOBAL SETTINGS</div>
         
         <div class="settings-row" style="border-bottom:none; margin-bottom:5px; padding-bottom:5px;">
             <div class="settings-label">Font Size</div>
             <div class="settings-control">
-                <button class="font-btn" onclick="changeFontSize(-1)">−</button>
+                <button class="font-btn" onclick="changeTruckingFontSize(-1)">−</button>
                 <span class="font-value" id="trucking-font-size-display">100%</span>
-                <button class="font-btn" onclick="changeFontSize(1)">+</button>
+                <button class="font-btn" onclick="changeTruckingFontSize(1)">+</button>
             </div>
         </div>
         
         <div class="settings-row" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
             <div class="settings-label">Opacity</div>
             <div class="settings-control">
-                <input type="range" class="opacity-slider" id="trucking-opacity-slider" min="50" max="100" value="95" oninput="changeOpacity(this.value)">
+                <input type="range" class="opacity-slider" id="trucking-opacity-slider" min="50" max="100" value="95" oninput="changeTruckingOpacity(this.value)">
                 <span class="font-value" id="trucking-opacity-display">95%</span>
             </div>
         </div>
     </div>
     
     <div class="settings-row" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
-        <div class="settings-label">Reset All</div>
+        <div class="settings-label">Reset Trucking Settings</div>
         <div class="settings-control">
-            <button class="font-btn" onclick="resetSettings()">Reset</button>
+            <button class="font-btn" onclick="resetTruckingSettings()">Reset</button>
         </div>
     </div>
 </div>
@@ -859,6 +881,9 @@ const STORAGE_KEY_SHOW_TRUCKING = "show_trucking_tracker";
 // Trucking Storage Keys
 const TRUCKING_STORAGE_KEY_CALC = "target_xp_trucking";
 const TRUCKING_STORAGE_KEY_MINI = "mini_mode_trucking";
+const TRUCKING_STORAGE_KEY_FONTSIZE = "font_size_trucking";
+const TRUCKING_STORAGE_KEY_OPACITY = "opacity_trucking";
+const TRUCKING_STORAGE_KEY_SHOW_CALC = "show_calculator_trucking";
 
 let APP_VISIBLE = true;
 let TRUCKING_VISIBLE = false;
@@ -920,28 +945,43 @@ if (savedMini === "true") {
 const savedFontSize = localStorage.getItem(STORAGE_KEY_FONTSIZE);
 if (savedFontSize) {
     document.getElementById('content').style.fontSize = savedFontSize + '%';
-    document.getElementById('trucking-content').style.fontSize = savedFontSize + '%';
     document.getElementById('font-size-display').innerText = savedFontSize + '%';
-    document.getElementById('trucking-font-size-display').innerText = savedFontSize + '%';
 } else {
     document.getElementById('font-size-display').innerText = '100%';
+}
+
+const savedTruckingFontSize = localStorage.getItem(TRUCKING_STORAGE_KEY_FONTSIZE);
+if (savedTruckingFontSize) {
+    document.getElementById('trucking-content').style.fontSize = savedTruckingFontSize + '%';
+    document.getElementById('trucking-font-size-display').innerText = savedTruckingFontSize + '%';
+    document.getElementById('control-trucking-font-size').innerText = savedTruckingFontSize + '%';
+} else {
     document.getElementById('trucking-font-size-display').innerText = '100%';
+    document.getElementById('control-trucking-font-size').innerText = '100%';
 }
 
 const savedOpacity = localStorage.getItem(STORAGE_KEY_OPACITY);
 if (savedOpacity) {
     document.getElementById('tracker-app').style.opacity = savedOpacity / 100;
-    document.getElementById('trucking-tracker-app').style.opacity = savedOpacity / 100;
     document.getElementById('opacity-slider').value = savedOpacity;
     document.getElementById('opacity-display').innerText = savedOpacity + '%';
-    document.getElementById('trucking-opacity-slider').value = savedOpacity;
-    document.getElementById('trucking-opacity-display').innerText = savedOpacity + '%';
     document.getElementById('control-opacity-slider').value = savedOpacity;
     document.getElementById('control-opacity-display').innerText = savedOpacity + '%';
 } else {
     document.getElementById('opacity-display').innerText = '95%';
-    document.getElementById('trucking-opacity-display').innerText = '95%';
     document.getElementById('control-opacity-display').innerText = '95%';
+}
+
+const savedTruckingOpacity = localStorage.getItem(TRUCKING_STORAGE_KEY_OPACITY);
+if (savedTruckingOpacity) {
+    document.getElementById('trucking-tracker-app').style.opacity = savedTruckingOpacity / 100;
+    document.getElementById('trucking-opacity-slider').value = savedTruckingOpacity;
+    document.getElementById('trucking-opacity-display').innerText = savedTruckingOpacity + '%';
+    document.getElementById('control-trucking-opacity').value = savedTruckingOpacity;
+    document.getElementById('control-trucking-opacity-display').innerText = savedTruckingOpacity + '%';
+} else {
+    document.getElementById('trucking-opacity-display').innerText = '95%';
+    document.getElementById('control-trucking-opacity-display').innerText = '95%';
 }
 
 const savedShowDest = localStorage.getItem(STORAGE_KEY_SHOW_DEST);
@@ -980,6 +1020,16 @@ if (savedShowTrucking === 'true') {
     TRUCKING_VISIBLE = true;
 } else {
     document.getElementById('control-show-trucking').checked = false;
+}
+
+const savedShowTruckingCalc = localStorage.getItem(TRUCKING_STORAGE_KEY_SHOW_CALC);
+if (savedShowTruckingCalc === 'false') {
+    document.getElementById('show-trucking-calculator').checked = false;
+    document.getElementById('control-show-trucking-calculator').checked = false;
+    toggleTruckingCalculator();
+} else {
+    document.getElementById('show-trucking-calculator').checked = true;
+    document.getElementById('control-show-trucking-calculator').checked = true;
 }
 
 // Sync control panel font size display
@@ -1037,21 +1087,30 @@ function toggleTruckingSettings() {
     truckingPanel.classList.toggle('show');
 }
 
-function changeFontSize(delta) {
+function changeCargoFontSize(delta) {
     const content = document.getElementById('content');
-    const truckingContent = document.getElementById('trucking-content');
     const display = document.getElementById('font-size-display');
-    const truckingDisplay = document.getElementById('trucking-font-size-display');
     const controlDisplay = document.getElementById('control-font-size-display');
     let current = parseInt(localStorage.getItem(STORAGE_KEY_FONTSIZE) || '100');
     current += (delta * 10);
     current = Math.max(60, Math.min(200, current));
     content.style.fontSize = current + '%';
-    if (truckingContent) truckingContent.style.fontSize = current + '%';
     display.innerText = current + '%';
-    if (truckingDisplay) truckingDisplay.innerText = current + '%';
     controlDisplay.innerText = current + '%';
     localStorage.setItem(STORAGE_KEY_FONTSIZE, current);
+}
+
+function changeTruckingFontSize(delta) {
+    const truckingContent = document.getElementById('trucking-content');
+    const truckingDisplay = document.getElementById('trucking-font-size-display');
+    const controlDisplay = document.getElementById('control-trucking-font-size');
+    let current = parseInt(localStorage.getItem(TRUCKING_STORAGE_KEY_FONTSIZE) || '100');
+    current += (delta * 10);
+    current = Math.max(60, Math.min(200, current));
+    if (truckingContent) truckingContent.style.fontSize = current + '%';
+    if (truckingDisplay) truckingDisplay.innerText = current + '%';
+    if (controlDisplay) controlDisplay.innerText = current + '%';
+    localStorage.setItem(TRUCKING_STORAGE_KEY_FONTSIZE, current);
 }
 
 function resetFontSize() {
@@ -1062,28 +1121,38 @@ function resetFontSize() {
     localStorage.setItem(STORAGE_KEY_FONTSIZE, '100');
 }
 
-function changeOpacity(value) {
+function changeCargoOpacity(value) {
     const app = document.getElementById('tracker-app');
-    const truckingApp = document.getElementById('trucking-tracker-app');
     const display = document.getElementById('opacity-display');
-    const truckingDisplay = document.getElementById('trucking-opacity-display');
     const controlDisplay = document.getElementById('control-opacity-display');
     
     app.style.opacity = value / 100;
-    if (truckingApp) truckingApp.style.opacity = value / 100;
-    
     display.innerText = value + '%';
-    if (truckingDisplay) truckingDisplay.innerText = value + '%';
     controlDisplay.innerText = value + '%';
-    
-    // Sync all sliders
     document.getElementById('opacity-slider').value = value;
-    if (document.getElementById('trucking-opacity-slider')) {
-        document.getElementById('trucking-opacity-slider').value = value;
-    }
     document.getElementById('control-opacity-slider').value = value;
     
     localStorage.setItem(STORAGE_KEY_OPACITY, value);
+}
+
+function changeTruckingOpacity(value) {
+    const truckingApp = document.getElementById('trucking-tracker-app');
+    const truckingDisplay = document.getElementById('trucking-opacity-display');
+    const controlDisplay = document.getElementById('control-trucking-opacity-display');
+    
+    if (truckingApp) truckingApp.style.opacity = value / 100;
+    if (truckingDisplay) truckingDisplay.innerText = value + '%';
+    if (controlDisplay) controlDisplay.innerText = value + '%';
+    
+    // Sync sliders
+    if (document.getElementById('trucking-opacity-slider')) {
+        document.getElementById('trucking-opacity-slider').value = value;
+    }
+    if (document.getElementById('control-trucking-opacity')) {
+        document.getElementById('control-trucking-opacity').value = value;
+    }
+    
+    localStorage.setItem(TRUCKING_STORAGE_KEY_OPACITY, value);
 }
 
 function minimizeUI() {
@@ -1104,28 +1173,25 @@ function restoreUITrucking() {
     document.getElementById('trucking-tracker-app').style.display = 'flex';
 }
 
-function resetSettings() {
-    // Reset font size
+function resetCargoSettings() {
+    // Reset cargo font size
     const content = document.getElementById('content');
-    const truckingContent = document.getElementById('trucking-content');
     content.style.fontSize = '100%';
-    if (truckingContent) truckingContent.style.fontSize = '100%';
     document.getElementById('font-size-display').innerText = '100%';
-    document.getElementById('trucking-font-size-display').innerText = '100%';
     document.getElementById('control-font-size-display').innerText = '100%';
     localStorage.setItem(STORAGE_KEY_FONTSIZE, '100');
     
-    // Reset opacity
-    changeOpacity(95);
+    // Reset cargo opacity
+    changeCargoOpacity(95);
     
-    // Reset destination display
+    // Reset cargo destination
     document.getElementById('show-destination').checked = true;
     document.getElementById('control-show-destination').checked = true;
     localStorage.setItem(STORAGE_KEY_SHOW_DEST, 'true');
     document.getElementById('dest-box').style.display = 'flex';
     document.getElementById('dest-box').setAttribute('data-visible', 'true');
     
-    // Reset calculator
+    // Reset cargo calculator
     document.getElementById('show-calculator').checked = true;
     document.getElementById('control-show-calculator').checked = true;
     localStorage.setItem(STORAGE_KEY_SHOW_CALC, 'true');
@@ -1137,6 +1203,36 @@ function resetSettings() {
             el.setAttribute('data-visible', 'true');
         }
     });
+}
+
+function resetTruckingSettings() {
+    // Reset trucking font size
+    const truckingContent = document.getElementById('trucking-content');
+    if (truckingContent) truckingContent.style.fontSize = '100%';
+    document.getElementById('trucking-font-size-display').innerText = '100%';
+    localStorage.setItem(TRUCKING_STORAGE_KEY_FONTSIZE, '100');
+    
+    // Reset trucking opacity
+    changeTruckingOpacity(95);
+    
+    // Reset trucking calculator
+    document.getElementById('show-trucking-calculator').checked = true;
+    document.getElementById('control-show-trucking-calculator').checked = true;
+    localStorage.setItem(TRUCKING_STORAGE_KEY_SHOW_CALC, 'true');
+    const truckingCalcElements = ['trucking-calc-sep-1', 'trucking-calc-input-section', 'trucking-calc-sep-2', 'trucking-calc-result-section'];
+    truckingCalcElements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.display = el.classList.contains('stat-separator') ? 'block' : 'flex';
+            el.setAttribute('data-visible', 'true');
+        }
+    });
+}
+
+function resetSettings() {
+    // This is called from F2 control panel - resets both trackers
+    resetCargoSettings();
+    resetTruckingSettings();
     
     // Reset tracker visibility
     document.getElementById('control-show-tracker').checked = true;
@@ -1191,6 +1287,33 @@ function toggleDestinationFromControl() {
 function toggleCalculatorFromControl() {
     document.getElementById('show-calculator').checked = document.getElementById('control-show-calculator').checked;
     toggleCalculator();
+}
+
+function toggleTruckingCalculator() {
+    const checked = document.getElementById('show-trucking-calculator').checked;
+    const elements = [
+        'trucking-calc-sep-1', 'trucking-calc-input-section', 'trucking-calc-sep-2', 'trucking-calc-result-section'
+    ];
+    elements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            if (checked) {
+                el.style.display = el.classList.contains('stat-separator') ? 'block' : 'flex';
+                el.setAttribute('data-visible', 'true');
+            } else {
+                el.style.display = 'none';
+                el.setAttribute('data-visible', 'false');
+            }
+        }
+    });
+    // Sync with control panel
+    document.getElementById('control-show-trucking-calculator').checked = checked;
+    localStorage.setItem(TRUCKING_STORAGE_KEY_SHOW_CALC, checked);
+}
+
+function toggleTruckingCalculatorFromControl() {
+    document.getElementById('show-trucking-calculator').checked = document.getElementById('control-show-trucking-calculator').checked;
+    toggleTruckingCalculator();
 }
 
 function toggleTrackerUI() {
