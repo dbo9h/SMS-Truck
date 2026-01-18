@@ -125,10 +125,21 @@ function saveCoords() {
 }
 
 // Get current player location (uses current player coords from cache)
-function getCurrentLocation(type) {
+async function getCurrentLocation(type) {
+    // Wait for coordinates if not available yet (up to 5 seconds)
     if (!state.cache.playerCoords) {
-        log("Player coordinates not available yet. Wait a moment and try again.", "warn");
-        return;
+        log("Waiting for player coordinates...", "info");
+        let attempts = 0;
+        while (!state.cache.playerCoords && attempts < 50) {
+            await sleep(100);
+            attempts++;
+        }
+        
+        if (!state.cache.playerCoords) {
+            log("Coordinates not received. The game may not be sending pos_x, pos_y, pos_z data yet.", "error");
+            log("Try moving around in-game or check if the app is receiving game data.", "info");
+            return;
+        }
     }
     
     const coords = state.cache.playerCoords;
@@ -140,7 +151,7 @@ function getCurrentLocation(type) {
         document.getElementById("storageZ").value = coords.z.toFixed(2);
         saveSettings();
         updateCoordsDisplay();
-        log(`Storage coordinates set: ${coords.x.toFixed(2)}, ${coords.y.toFixed(2)}, ${coords.z.toFixed(2)}`, "success");
+        log(`Storage coordinates captured: ${coords.x.toFixed(2)}, ${coords.y.toFixed(2)}, ${coords.z.toFixed(2)}`, "success");
     } else if (type === "quarry") {
         state.config.quarryCoords = { x: coords.x, y: coords.y, z: coords.z };
         document.getElementById("quarryX").value = coords.x.toFixed(2);
@@ -148,7 +159,7 @@ function getCurrentLocation(type) {
         document.getElementById("quarryZ").value = coords.z.toFixed(2);
         saveSettings();
         updateCoordsDisplay();
-        log(`Quarry coordinates set: ${coords.x.toFixed(2)}, ${coords.y.toFixed(2)}, ${coords.z.toFixed(2)}`, "success");
+        log(`Quarry coordinates captured: ${coords.x.toFixed(2)}, ${coords.y.toFixed(2)}, ${coords.z.toFixed(2)}`, "success");
     }
 }
 
@@ -317,13 +328,22 @@ window.addEventListener("message", (event) => {
     
     try {
         // Auto-detect player coordinates from game data (pos_x, pos_y, pos_z)
-        let playerX = data.pos_x;
-        let playerY = data.pos_y;
-        let playerZ = data.pos_z;
-        
-        if (playerX !== undefined && playerY !== undefined && playerZ !== undefined) {
-            state.cache.playerCoords = { x: playerX, y: playerY, z: playerZ };
-            updateStatusDisplay(); // Update position display
+        // Check for pos_x, pos_y, pos_z (TTycoon format)
+        if (data.pos_x !== undefined && data.pos_y !== undefined && data.pos_z !== undefined) {
+            const newCoords = { 
+                x: parseFloat(data.pos_x), 
+                y: parseFloat(data.pos_y), 
+                z: parseFloat(data.pos_z) 
+            };
+            
+            // Only update if coordinates actually changed (avoid unnecessary updates)
+            if (!state.cache.playerCoords || 
+                state.cache.playerCoords.x !== newCoords.x || 
+                state.cache.playerCoords.y !== newCoords.y || 
+                state.cache.playerCoords.z !== newCoords.z) {
+                state.cache.playerCoords = newCoords;
+                updateStatusDisplay(); // Update position display
+            }
             
             // Auto-detect storage/quarry when player is near (within 5 units)
             if (state.config.storageCoords) {
