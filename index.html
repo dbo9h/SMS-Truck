@@ -51,9 +51,37 @@
                         Coordinates <span class="submenu-toggle">▼</span>
                     </div>
                     <div class="submenu-content">
-                        <button onclick="setStorageCoords()">Set Storage Coords</button>
-                        <button onclick="setQuarryCoords()">Set Quarry Coords</button>
-                        <div id="coordsInfo" style="margin-top: 10px; font-size: 11px; color: #aaa;">
+                        <label>
+                            Storage X:
+                            <input type="number" id="storageX" step="0.1" placeholder="Auto">
+                        </label>
+                        <label>
+                            Storage Y:
+                            <input type="number" id="storageY" step="0.1" placeholder="Auto">
+                        </label>
+                        <label>
+                            Storage Z:
+                            <input type="number" id="storageZ" step="0.1" placeholder="Auto">
+                        </label>
+                        <label>
+                            Quarry X:
+                            <input type="number" id="quarryX" step="0.1" placeholder="Auto">
+                        </label>
+                        <label>
+                            Quarry Y:
+                            <input type="number" id="quarryY" step="0.1" placeholder="Auto">
+                        </label>
+                        <label>
+                            Quarry Z:
+                            <input type="number" id="quarryZ" step="0.1" placeholder="Auto">
+                        </label>
+                        <button onclick="saveCoords()" style="grid-column: span 2; margin-top: 5px;">Save Coordinates</button>
+                        <button onclick="getCurrentLocation('storage')" style="grid-column: span 2;">Capture Current Location (Storage)</button>
+                        <button onclick="getCurrentLocation('quarry')" style="grid-column: span 2;">Capture Current Location (Quarry)</button>
+                        <div style="grid-column: span 2; margin-top: 10px; font-size: 11px; color: #888;">
+                            <div>Current Position: <span id="currentPos">Waiting for data...</span></div>
+                        </div>
+                        <div id="coordsInfo" style="grid-column: span 2; margin-top: 10px; font-size: 11px; color: #aaa;">
                             Storage: Not set<br>
                             Quarry: Not set
                         </div>

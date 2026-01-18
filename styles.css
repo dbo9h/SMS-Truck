@@ -176,6 +176,11 @@ html {
     margin-left: auto;
 }
 
+.user-input input[type="number"]::placeholder {
+    color: #666;
+    font-style: italic;
+}
+
 .user-input input[type="number"]:focus {
     outline: none;
     border-color: #0d47a1;

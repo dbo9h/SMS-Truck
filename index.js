@@ -15,7 +15,8 @@ const state = {
         trigger_dtccustom: null,
         notification: null,
         job: null,
-        keybindsEnabled: true
+        keybindsEnabled: true,
+        playerCoords: null
     },
     config: {
         autoDump: true,
@@ -84,6 +85,71 @@ function updateCoordsDisplay() {
             : "Not set";
         info.innerHTML = `Storage: ${storage}<br>Quarry: ${quarry}`;
     }
+    
+    // Update input fields
+    if (state.config.storageCoords) {
+        document.getElementById("storageX").value = state.config.storageCoords.x || "";
+        document.getElementById("storageY").value = state.config.storageCoords.y || "";
+        document.getElementById("storageZ").value = state.config.storageCoords.z || "";
+    }
+    
+    if (state.config.quarryCoords) {
+        document.getElementById("quarryX").value = state.config.quarryCoords.x || "";
+        document.getElementById("quarryY").value = state.config.quarryCoords.y || "";
+        document.getElementById("quarryZ").value = state.config.quarryCoords.z || "";
+    }
+}
+
+// Save coordinates from input fields
+function saveCoords() {
+    const storageX = parseFloat(document.getElementById("storageX").value);
+    const storageY = parseFloat(document.getElementById("storageY").value);
+    const storageZ = parseFloat(document.getElementById("storageZ").value);
+    
+    const quarryX = parseFloat(document.getElementById("quarryX").value);
+    const quarryY = parseFloat(document.getElementById("quarryY").value);
+    const quarryZ = parseFloat(document.getElementById("quarryZ").value);
+    
+    if (!isNaN(storageX) && !isNaN(storageY) && !isNaN(storageZ)) {
+        state.config.storageCoords = { x: storageX, y: storageY, z: storageZ };
+        log(`Storage coordinates saved: ${storageX}, ${storageY}, ${storageZ}`, "success");
+    }
+    
+    if (!isNaN(quarryX) && !isNaN(quarryY) && !isNaN(quarryZ)) {
+        state.config.quarryCoords = { x: quarryX, y: quarryY, z: quarryZ };
+        log(`Quarry coordinates saved: ${quarryX}, ${quarryY}, ${quarryZ}`, "success");
+    }
+    
+    saveSettings();
+    updateCoordsDisplay();
+}
+
+// Get current player location (uses current player coords from cache)
+function getCurrentLocation(type) {
+    if (!state.cache.playerCoords) {
+        log("Player coordinates not available yet. Wait a moment and try again.", "warn");
+        return;
+    }
+    
+    const coords = state.cache.playerCoords;
+    
+    if (type === "storage") {
+        state.config.storageCoords = { x: coords.x, y: coords.y, z: coords.z };
+        document.getElementById("storageX").value = coords.x.toFixed(2);
+        document.getElementById("storageY").value = coords.y.toFixed(2);
+        document.getElementById("storageZ").value = coords.z.toFixed(2);
+        saveSettings();
+        updateCoordsDisplay();
+        log(`Storage coordinates set: ${coords.x.toFixed(2)}, ${coords.y.toFixed(2)}, ${coords.z.toFixed(2)}`, "success");
+    } else if (type === "quarry") {
+        state.config.quarryCoords = { x: coords.x, y: coords.y, z: coords.z };
+        document.getElementById("quarryX").value = coords.x.toFixed(2);
+        document.getElementById("quarryY").value = coords.y.toFixed(2);
+        document.getElementById("quarryZ").value = coords.z.toFixed(2);
+        saveSettings();
+        updateCoordsDisplay();
+        log(`Quarry coordinates set: ${coords.x.toFixed(2)}, ${coords.y.toFixed(2)}, ${coords.z.toFixed(2)}`, "success");
+    }
 }
 
 function setupEventListeners() {
@@ -114,6 +180,16 @@ function setupEventListeners() {
             saveSettings();
         });
     }
+    
+    // Coordinate input listeners
+    ["storageX", "storageY", "storageZ", "quarryX", "quarryY", "quarryZ"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                saveCoords();
+            });
+        }
+    });
 }
 
 function toggleSubmenu(header) {
@@ -191,48 +267,44 @@ async function startAutomationLoop() {
     state.currentStep = null;
 }
 
+// Get distance between two coordinates
+function getDistance(coord1, coord2) {
+    if (!coord1 || !coord2) return Infinity;
+    const dx = coord1.x - coord2.x;
+    const dy = coord1.y - coord2.y;
+    const dz = coord1.z - coord2.z;
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
 async function moveToLocation(coords) {
     if (!coords || !coords.x || !coords.y || !coords.z) {
         throw new Error("Invalid coordinates");
     }
     
+    // Use setWaypoint command (TTycoon API)
     window.parent.postMessage({
-        type: "moveToLocation",
-        coords: { x: coords.x, y: coords.y, z: coords.z }
+        type: "setWaypoint",
+        x: coords.x,
+        y: coords.y
     }, "*");
     
-    await sleep(5000);
+    // Wait until player is near destination (within 5 units)
+    let attempts = 0;
+    while (attempts < 100) {
+        await sleep(500);
+        if (state.cache.playerCoords) {
+            const distance = getDistance(state.cache.playerCoords, coords);
+            if (distance < 5) {
+                log(`Arrived at destination (distance: ${distance.toFixed(2)})`, "success");
+                return;
+            }
+        }
+        attempts++;
+    }
+    
+    log("Movement timeout - continuing anyway", "warn");
 }
 
-function setStorageCoords() {
-    const input = prompt("Enter Storage coordinates (format: x,y,z):\nExample: 100.0,200.0,30.0");
-    if (!input) return;
-    
-    const parts = input.split(",").map(s => parseFloat(s.trim()));
-    if (parts.length === 3 && !parts.some(isNaN)) {
-        state.config.storageCoords = { x: parts[0], y: parts[1], z: parts[2] };
-        saveSettings();
-        updateCoordsDisplay();
-        log(`Storage coordinates set: ${parts[0]}, ${parts[1]}, ${parts[2]}`, "success");
-    } else {
-        log("Invalid coordinates format. Use: x,y,z", "error");
-    }
-}
-
-function setQuarryCoords() {
-    const input = prompt("Enter Quarry coordinates (format: x,y,z):\nExample: 200.0,300.0,30.0");
-    if (!input) return;
-    
-    const parts = input.split(",").map(s => parseFloat(s.trim()));
-    if (parts.length === 3 && !parts.some(isNaN)) {
-        state.config.quarryCoords = { x: parts[0], y: parts[1], z: parts[2] };
-        saveSettings();
-        updateCoordsDisplay();
-        log(`Quarry coordinates set: ${parts[0]}, ${parts[1]}, ${parts[2]}`, "success");
-    } else {
-        log("Invalid coordinates format. Use: x,y,z", "error");
-    }
-}
 
 function clearLog() {
     document.getElementById("logContent").innerHTML = "";
@@ -244,6 +316,74 @@ window.addEventListener("message", (event) => {
     if (!data || Object.keys(data).length === 0) return;
     
     try {
+        // Auto-detect player coordinates from game data (pos_x, pos_y, pos_z)
+        let playerX = data.pos_x;
+        let playerY = data.pos_y;
+        let playerZ = data.pos_z;
+        
+        if (playerX !== undefined && playerY !== undefined && playerZ !== undefined) {
+            state.cache.playerCoords = { x: playerX, y: playerY, z: playerZ };
+            updateStatusDisplay(); // Update position display
+            
+            // Auto-detect storage/quarry when player is near (within 5 units)
+            if (state.config.storageCoords) {
+                const dist = getDistance(state.cache.playerCoords, state.config.storageCoords);
+                if (dist < 5 && state.currentStep !== "dumping") {
+                    // Player is at storage
+                }
+            }
+            
+            if (state.config.quarryCoords) {
+                const dist = getDistance(state.cache.playerCoords, state.config.quarryCoords);
+                if (dist < 5 && state.currentStep !== "collecting") {
+                    // Player is at quarry
+                }
+            }
+        }
+        
+        // Handle automatic coordinate updates from game
+        if (data.storageCoords) {
+            state.config.storageCoords = data.storageCoords;
+            document.getElementById("storageX").value = data.storageCoords.x || "";
+            document.getElementById("storageY").value = data.storageCoords.y || "";
+            document.getElementById("storageZ").value = data.storageCoords.z || "";
+            saveSettings();
+            updateCoordsDisplay();
+            log("Storage coordinates updated automatically", "success");
+        }
+        
+        if (data.quarryCoords) {
+            state.config.quarryCoords = data.quarryCoords;
+            document.getElementById("quarryX").value = data.quarryCoords.x || "";
+            document.getElementById("quarryY").value = data.quarryCoords.y || "";
+            document.getElementById("quarryZ").value = data.quarryCoords.z || "";
+            saveSettings();
+            updateCoordsDisplay();
+            log("Quarry coordinates updated automatically", "success");
+        }
+        
+        // Handle current location response
+        if (data.currentLocation && data.locationType) {
+            const coords = data.currentLocation;
+            if (data.locationType === "storage") {
+                state.config.storageCoords = coords;
+                document.getElementById("storageX").value = coords.x || "";
+                document.getElementById("storageY").value = coords.y || "";
+                document.getElementById("storageZ").value = coords.z || "";
+                saveSettings();
+                updateCoordsDisplay();
+                log(`Storage coordinates set from current location: ${coords.x}, ${coords.y}, ${coords.z}`, "success");
+            } else if (data.locationType === "quarry") {
+                state.config.quarryCoords = coords;
+                document.getElementById("quarryX").value = coords.x || "";
+                document.getElementById("quarryY").value = coords.y || "";
+                document.getElementById("quarryZ").value = coords.z || "";
+                saveSettings();
+                updateCoordsDisplay();
+                log(`Quarry coordinates set from current location: ${coords.x}, ${coords.y}, ${coords.z}`, "success");
+            }
+        }
+        
         if (state.cache.keybindsEnabled && state.cache.job === "trucker" && state.automationActive) {
             if (data.trigger_dtcexecute != null && data.trigger_dtcexecute !== state.cache.trigger_dtcexecute) {
                 console.log(`nuiExecute: ${data.trigger_dtcexecute} ${typeof data.trigger_dtcexecute} ${state.cache.trigger_dtcexecute} ${typeof state.cache.trigger_dtcexecute}`);
@@ -269,7 +409,7 @@ window.addEventListener("message", (event) => {
         for (let [key, value] of Object.entries(data)) {
             if (key === "menu_choices") {
                 state.cache[key] = typeof value === "string" ? JSON.parse(value || "[]") : (value || []);
-            } else {
+            } else if (key !== "storageCoords" && key !== "quarryCoords" && key !== "currentLocation" && key !== "locationType") {
                 state.cache[key] = value;
             }
         }
@@ -285,6 +425,7 @@ function updateStatusDisplay() {
     const menuStatus = document.getElementById("menuStatus");
     const executingStatus = document.getElementById("executingStatus");
     const lastAction = document.getElementById("lastAction");
+    const currentPos = document.getElementById("currentPos");
     
     if (menuStatus) menuStatus.textContent = state.cache.menu_open ? "Yes" : "No";
     if (executingStatus) executingStatus.textContent = state.executingActions ? "Yes" : "No";
@@ -297,6 +438,13 @@ function updateStatusDisplay() {
             "collecting": "Collecting"
         };
         lastAction.textContent = stepNames[state.currentStep] || "None";
+    }
+    
+    if (currentPos && state.cache.playerCoords) {
+        const c = state.cache.playerCoords;
+        currentPos.textContent = `${c.x.toFixed(1)}, ${c.y.toFixed(1)}, ${c.z.toFixed(1)}`;
+    } else if (currentPos) {
+        currentPos.textContent = "Waiting for data...";
     }
 }
 
@@ -553,5 +701,5 @@ function log(message, type = "info") {
 window.toggleAutomation = toggleAutomation;
 window.clearLog = clearLog;
 window.toggleSubmenu = toggleSubmenu;
-window.setStorageCoords = setStorageCoords;
-window.setQuarryCoords = setQuarryCoords;
+window.saveCoords = saveCoords;
+window.getCurrentLocation = getCurrentLocation;
