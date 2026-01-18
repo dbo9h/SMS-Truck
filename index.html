@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trucking Automation</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="main">
+        <div class="user-input">
+            <div class="button-container">
+                <button class="toggle-automation" onclick="toggleAutomation()">
+                    <span id="automationStatus">Start Automation</span>
+                </button>
+            </div>
+            
+            <div class="collapsible">
+                <!-- Automation Settings -->
+                <div class="submenu">
+                    <div class="submenu-header" onclick="toggleSubmenu(this)">
+                        Automation Settings <span class="submenu-toggle">▼</span>
+                    </div>
+                    <div class="submenu-content">
+                        <label for="autoDump">
+                            <input type="checkbox" id="autoDump" checked>
+                            Auto Dump Cargo
+                        </label>
+                        <label for="autoTake">
+                            <input type="checkbox" id="autoTake">
+                            Auto Take to Trunk
+                        </label>
+                        <label for="autoCloseMenu">
+                            <input type="checkbox" id="autoCloseMenu" checked>
+                            Auto Close Menu
+                        </label>
+                        <label for="interactionDelay">
+                            Interaction Delay (ms):
+                            <input type="number" id="interactionDelay" value="500" min="100" max="2000" step="100">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div class="submenu">
+                    <div class="submenu-header" onclick="toggleSubmenu(this)">
+                        Status <span class="submenu-toggle">▼</span>
+                    </div>
+                    <div class="submenu-content">
+                        <div id="statusInfo">
+                            <div>Menu Open: <span id="menuStatus">No</span></div>
+                            <div>Last Action: <span id="lastAction">None</span></div>
+                            <div>Executing: <span id="executingStatus">No</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Log -->
+                <div class="submenu">
+                    <div class="submenu-header" onclick="toggleSubmenu(this)">
+                        Activity Log <span class="submenu-toggle">▼</span>
+                    </div>
+                    <div class="submenu-content">
+                        <div id="logContent" class="log-content"></div>
+                        <button onclick="clearLog()" class="clear-log-btn">Clear Log</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>
