@@ -33,29 +33,48 @@ const NUI_RETRIES = 300;
 const NUI_TIMEOUT = 10;
 const NUI_EXTRA_DELAY = 10;
 
+let getDataRequestCount = 0;
+let lastMessageTime = null;
+let getDataInterval = null;
+
 document.addEventListener("DOMContentLoaded", () => {
     loadSettings();
     setupEventListeners();
     log("Automation app loaded", "info");
-    
+
     // Request data from game client (critical for receiving pos_x, pos_y, pos_z)
-    setTimeout(() => {
+    function requestGameData() {
+        console.log("[DEBUG] Sending getData request #" + (++getDataRequestCount));
         window.parent.postMessage({ type: "getData" }, "*");
-        
+        log(`getData request sent (#${getDataRequestCount})`, "info");
+    }
+
+    setTimeout(() => {
+        requestGameData();
+
         // Register triggers for automation
+        console.log("[DEBUG] Registering triggers");
         window.parent.postMessage({
             type: "registerTrigger",
             trigger: "dtcdump",
             name: "Auto Dump"
         }, "*");
-        
+
         window.parent.postMessage({
             type: "registerTrigger",
             trigger: "dtctake",
             name: "Auto Take"
         }, "*");
-        
-        log("Requested game data and registered triggers", "info");
+
+        log("Triggers registered", "info");
+
+        // Send getData periodically every 5 seconds to ensure we get data
+        getDataInterval = setInterval(() => {
+            if (!state.cache.playerCoords) {
+                console.log("[DEBUG] Still no coordinates, requesting again...");
+                requestGameData();
+            }
+        }, 5000);
     }, 250);
 });
 
@@ -96,7 +115,7 @@ function updateUI() {
 function updateCoordsDisplay() {
     const info = document.getElementById("coordsInfo");
     if (info) {
-        const storage = state.config.storageCoords 
+        const storage = state.config.storageCoords
             ? `${state.config.storageCoords.x}, ${state.config.storageCoords.y}, ${state.config.storageCoords.z}`
             : "Not set";
         const quarry = state.config.quarryCoords
@@ -104,14 +123,14 @@ function updateCoordsDisplay() {
             : "Not set";
         info.innerHTML = `Storage: ${storage}<br>Quarry: ${quarry}`;
     }
-    
+
     // Update input fields
     if (state.config.storageCoords) {
         document.getElementById("storageX").value = state.config.storageCoords.x || "";
         document.getElementById("storageY").value = state.config.storageCoords.y || "";
         document.getElementById("storageZ").value = state.config.storageCoords.z || "";
     }
-    
+
     if (state.config.quarryCoords) {
         document.getElementById("quarryX").value = state.config.quarryCoords.x || "";
         document.getElementById("quarryY").value = state.config.quarryCoords.y || "";
@@ -124,21 +143,21 @@ function saveCoords() {
     const storageX = parseFloat(document.getElementById("storageX").value);
     const storageY = parseFloat(document.getElementById("storageY").value);
     const storageZ = parseFloat(document.getElementById("storageZ").value);
-    
+
     const quarryX = parseFloat(document.getElementById("quarryX").value);
     const quarryY = parseFloat(document.getElementById("quarryY").value);
     const quarryZ = parseFloat(document.getElementById("quarryZ").value);
-    
+
     if (!isNaN(storageX) && !isNaN(storageY) && !isNaN(storageZ)) {
         state.config.storageCoords = { x: storageX, y: storageY, z: storageZ };
         log(`Storage coordinates saved: ${storageX}, ${storageY}, ${storageZ}`, "success");
     }
-    
+
     if (!isNaN(quarryX) && !isNaN(quarryY) && !isNaN(quarryZ)) {
         state.config.quarryCoords = { x: quarryX, y: quarryY, z: quarryZ };
         log(`Quarry coordinates saved: ${quarryX}, ${quarryY}, ${quarryZ}`, "success");
     }
-    
+
     saveSettings();
     updateCoordsDisplay();
 }
@@ -153,16 +172,16 @@ async function getCurrentLocation(type) {
             await sleep(100);
             attempts++;
         }
-        
+
         if (!state.cache.playerCoords) {
             log("Coordinates not received. The game may not be sending pos_x, pos_y, pos_z data yet.", "error");
             log("Try moving around in-game or check if the app is receiving game data.", "info");
             return;
         }
     }
-    
+
     const coords = state.cache.playerCoords;
-    
+
     if (type === "storage") {
         state.config.storageCoords = { x: coords.x, y: coords.y, z: coords.z };
         document.getElementById("storageX").value = coords.x.toFixed(2);
@@ -187,22 +206,22 @@ function setupEventListeners() {
         state.config.autoDump = e.target.checked;
         saveSettings();
     });
-    
+
     document.getElementById("autoTake").addEventListener("change", (e) => {
         state.config.autoTake = e.target.checked;
         saveSettings();
     });
-    
+
     document.getElementById("autoCloseMenu").addEventListener("change", (e) => {
         state.config.autoCloseMenu = e.target.checked;
         saveSettings();
     });
-    
+
     document.getElementById("interactionDelay").addEventListener("input", (e) => {
         state.config.interactionDelay = parseInt(e.target.value);
         saveSettings();
     });
-    
+
     const loopDelayEl = document.getElementById("loopDelay");
     if (loopDelayEl) {
         loopDelayEl.addEventListener("input", (e) => {
@@ -210,7 +229,7 @@ function setupEventListeners() {
             saveSettings();
         });
     }
-    
+
     // Coordinate input listeners
     ["storageX", "storageY", "storageZ", "quarryX", "quarryY", "quarryZ"].forEach(id => {
         const el = document.getElementById(id);
@@ -225,7 +244,7 @@ function setupEventListeners() {
 function toggleSubmenu(header) {
     const content = header.nextElementSibling;
     const toggle = header.querySelector(".submenu-toggle");
-    
+
     if (content.classList.contains("collapsed")) {
         content.classList.remove("collapsed");
         toggle.textContent = "▼";
@@ -237,13 +256,13 @@ function toggleSubmenu(header) {
 
 function toggleAutomation() {
     state.automationActive = !state.automationActive;
-    
+
     const statusEl = document.getElementById("automationStatus");
     if (state.automationActive) {
         statusEl.textContent = "Stop Automation";
         statusEl.parentElement.classList.add("active");
         log("Automation started", "info");
-        
+
         if (state.config.storageCoords && state.config.quarryCoords) {
             startAutomationLoop();
         } else {
@@ -259,41 +278,41 @@ function toggleAutomation() {
 
 async function startAutomationLoop() {
     if (state.automationLoop) return;
-    
+
     state.automationLoop = true;
     log("Starting automation loop...", "info");
-    
+
     while (state.automationLoop && state.automationActive) {
         try {
             state.currentStep = "moving_to_storage";
             log("Moving to storage...", "info");
             await moveToLocation(state.config.storageCoords);
             await sleep(state.config.loopDelay);
-            
+
             state.currentStep = "dumping";
             log("Dumping cargo...", "info");
             await executeDump();
             await sleep(state.config.loopDelay);
-            
+
             state.currentStep = "moving_to_quarry";
             log("Moving to quarry...", "info");
             await moveToLocation(state.config.quarryCoords);
             await sleep(state.config.loopDelay);
-            
+
             state.currentStep = "collecting";
             log("Collecting items...", "info");
             await executeTake();
             await sleep(state.config.loopDelay);
-            
+
             log("Loop completed, starting again...", "success");
             await sleep(state.config.loopDelay);
-            
+
         } catch (error) {
             log(`Loop error: ${error}`, "error");
             await sleep(state.config.loopDelay * 2);
         }
     }
-    
+
     state.currentStep = null;
 }
 
@@ -310,14 +329,14 @@ async function moveToLocation(coords) {
     if (!coords || !coords.x || !coords.y || !coords.z) {
         throw new Error("Invalid coordinates");
     }
-    
+
     // Use setWaypoint command (TTycoon API)
     window.parent.postMessage({
         type: "setWaypoint",
         x: coords.x,
         y: coords.y
     }, "*");
-    
+
     // Wait until player is near destination (within 5 units)
     let attempts = 0;
     while (attempts < 100) {
@@ -331,7 +350,7 @@ async function moveToLocation(coords) {
         }
         attempts++;
     }
-    
+
     log("Movement timeout - continuing anyway", "warn");
 }
 
@@ -342,28 +361,28 @@ function clearLog() {
 
 window.addEventListener("message", (event) => {
     const data = event.data;
-    
+
     if (!data || Object.keys(data).length === 0) return;
-    
+
     try {
         // Auto-detect player coordinates from game data (pos_x, pos_y, pos_z)
         // Check for pos_x, pos_y, pos_z (TTycoon format)
         if (data.pos_x !== undefined && data.pos_y !== undefined && data.pos_z !== undefined) {
-            const newCoords = { 
-                x: parseFloat(data.pos_x), 
-                y: parseFloat(data.pos_y), 
-                z: parseFloat(data.pos_z) 
+            const newCoords = {
+                x: parseFloat(data.pos_x),
+                y: parseFloat(data.pos_y),
+                z: parseFloat(data.pos_z)
             };
-            
+
             // Only update if coordinates actually changed (avoid unnecessary updates)
-            if (!state.cache.playerCoords || 
-                state.cache.playerCoords.x !== newCoords.x || 
-                state.cache.playerCoords.y !== newCoords.y || 
+            if (!state.cache.playerCoords ||
+                state.cache.playerCoords.x !== newCoords.x ||
+                state.cache.playerCoords.y !== newCoords.y ||
                 state.cache.playerCoords.z !== newCoords.z) {
                 state.cache.playerCoords = newCoords;
                 updateStatusDisplay(); // Update position display
             }
-            
+
             // Auto-detect storage/quarry when player is near (within 5 units)
             if (state.config.storageCoords) {
                 const dist = getDistance(state.cache.playerCoords, state.config.storageCoords);
@@ -371,7 +390,7 @@ window.addEventListener("message", (event) => {
                     // Player is at storage
                 }
             }
-            
+
             if (state.config.quarryCoords) {
                 const dist = getDistance(state.cache.playerCoords, state.config.quarryCoords);
                 if (dist < 5 && state.currentStep !== "collecting") {
@@ -379,7 +398,7 @@ window.addEventListener("message", (event) => {
                 }
             }
         }
-        
+
         // Handle automatic coordinate updates from game
         if (data.storageCoords) {
             state.config.storageCoords = data.storageCoords;
@@ -390,7 +409,7 @@ window.addEventListener("message", (event) => {
             updateCoordsDisplay();
             log("Storage coordinates updated automatically", "success");
         }
-        
+
         if (data.quarryCoords) {
             state.config.quarryCoords = data.quarryCoords;
             document.getElementById("quarryX").value = data.quarryCoords.x || "";
@@ -400,7 +419,7 @@ window.addEventListener("message", (event) => {
             updateCoordsDisplay();
             log("Quarry coordinates updated automatically", "success");
         }
-        
+
         // Handle current location response
         if (data.currentLocation && data.locationType) {
             const coords = data.currentLocation;
@@ -422,7 +441,7 @@ window.addEventListener("message", (event) => {
                 log(`Quarry coordinates set from current location: ${coords.x}, ${coords.y}, ${coords.z}`, "success");
             }
         }
-        
+
         if (state.cache.keybindsEnabled && state.cache.job === "trucker" && state.automationActive) {
             if (data.trigger_dtcexecute != null && data.trigger_dtcexecute !== state.cache.trigger_dtcexecute) {
                 console.log(`nuiExecute: ${data.trigger_dtcexecute} ${typeof data.trigger_dtcexecute} ${state.cache.trigger_dtcexecute} ${typeof state.cache.trigger_dtcexecute}`);
@@ -444,7 +463,7 @@ window.addEventListener("message", (event) => {
                 state.cache.trigger_dtccustom = data.trigger_dtccustom;
             }
         }
-        
+
         for (let [key, value] of Object.entries(data)) {
             if (key === "menu_choices") {
                 state.cache[key] = typeof value === "string" ? JSON.parse(value || "[]") : (value || []);
@@ -452,9 +471,9 @@ window.addEventListener("message", (event) => {
                 state.cache[key] = value;
             }
         }
-        
+
         updateStatusDisplay();
-        
+
     } catch (error) {
         console.error("Error handling message:", error);
     }
@@ -465,10 +484,10 @@ function updateStatusDisplay() {
     const executingStatus = document.getElementById("executingStatus");
     const lastAction = document.getElementById("lastAction");
     const currentPos = document.getElementById("currentPos");
-    
+
     if (menuStatus) menuStatus.textContent = state.cache.menu_open ? "Yes" : "No";
     if (executingStatus) executingStatus.textContent = state.executingActions ? "Yes" : "No";
-    
+
     if (lastAction && state.currentStep) {
         const stepNames = {
             "moving_to_storage": "Moving to Storage",
@@ -478,7 +497,7 @@ function updateStatusDisplay() {
         };
         lastAction.textContent = stepNames[state.currentStep] || "None";
     }
-    
+
     if (currentPos && state.cache.playerCoords) {
         const c = state.cache.playerCoords;
         currentPos.textContent = `${c.x.toFixed(1)}, ${c.y.toFixed(1)}, ${c.z.toFixed(1)}`;
@@ -492,21 +511,21 @@ async function executeDump() {
         log("Already executing actions, skipping dump...", "warn");
         return false;
     }
-    
+
     console.log("Executing NUI dump...");
     document.getElementById("lastAction").textContent = "Dump";
-    
+
     try {
         state.executingActions = true;
         const dumpActions = buildDumpActions();
-        
+
         if (!dumpActions || dumpActions.length === 0) {
             log("No valid actions to execute", "error");
             return false;
         }
-        
+
         const success = await executeActions(dumpActions, true);
-        
+
         if (success) {
             log("Successfully executed dump actions", "success");
             return true;
@@ -530,13 +549,13 @@ function buildDumpActions() {
         [{ action: "Empty Trunk", mod: 0 }],
         [{ action: "Dump", mod: 0 }]
     ];
-    
+
     for (const path of dumpPaths) {
         if (hasMenuOption(path[0].action)) {
             return [{ actions: path, amount: 0 }];
         }
     }
-    
+
     return [];
 }
 
@@ -545,21 +564,21 @@ async function executeTake() {
         log("Already executing actions, skipping take...", "warn");
         return false;
     }
-    
+
     console.log("Executing NUI take...");
     document.getElementById("lastAction").textContent = "Take";
-    
+
     try {
         state.executingActions = true;
         const takeActions = buildTakeActions();
-        
+
         if (!takeActions || takeActions.length === 0) {
             log("No valid actions to execute", "error");
             return false;
         }
-        
+
         const success = await executeActions(takeActions, true);
-        
+
         if (success) {
             log("Successfully executed take actions", "success");
             return true;
@@ -583,13 +602,13 @@ function buildTakeActions() {
         [{ action: "Load to Trunk", mod: 0 }],
         [{ action: "Store in Trunk", mod: 0 }]
     ];
-    
+
     for (const path of takePaths) {
         if (hasMenuOption(path[0].action)) {
             return [{ actions: path, amount: 0 }];
         }
     }
-    
+
     return [];
 }
 
@@ -598,48 +617,48 @@ async function executeActions(actions, closeMenu = true) {
         if (state.executingActions && !closeMenu) {
             throw new Error("Already executing NUI actions");
         }
-        
+
         state.executingActions = true;
-        
+
         for (const actionSet of actions) {
             for (const action of actionSet.actions) {
                 await waitFor(() => {
-                    return state.cache.menu_open && 
-                           (state.cache.menu_choices ?? []).findIndex(choice => {
-                               if (!choice || !choice[0]) return false;
-                               const cleanText = choice[0].replace(/(<.+?>)|(&#.+?;)/g, "");
-                               return cleanText === action.action;
-                           }) !== -1;
+                    return state.cache.menu_open &&
+                        (state.cache.menu_choices ?? []).findIndex(choice => {
+                            if (!choice || !choice[0]) return false;
+                            const cleanText = choice[0].replace(/(<.+?>)|(&#.+?;)/g, "");
+                            return cleanText === action.action;
+                        }) !== -1;
                 }, NUI_RETRIES, NUI_TIMEOUT);
-                
+
                 const menuChoice = state.cache.menu_choices.find(choice => {
                     if (!choice || !choice[0]) return false;
                     const cleanText = choice[0].replace(/(<.+?>)|(&#.+?;)/g, "");
                     return cleanText === action.action;
                 });
-                
+
                 if (menuChoice) {
                     await selectMenuOption(menuChoice[0], action.mod || 0);
                 }
             }
-            
+
             if (actionSet.amount > 0) {
                 await waitFor(() => state.cache.prompt === true, NUI_RETRIES, NUI_TIMEOUT);
                 await submitValue(actionSet.amount);
             }
-            
+
             await sleep(NUI_EXTRA_DELAY);
-            
+
             if (closeMenu && state.cache.menu_open) {
                 await closeMenu();
             }
         }
-        
+
         await sleep(NUI_TIMEOUT);
         if (closeMenu && state.cache.menu_open) {
             await closeMenu();
         }
-        
+
         return true;
     } catch (error) {
         log(`Error in executeActions: ${error?.message || error}`, "error");
@@ -670,7 +689,7 @@ function hasMenuOption(text) {
     if (!state.cache.menu_choices || !Array.isArray(state.cache.menu_choices)) {
         return false;
     }
-    
+
     return state.cache.menu_choices.some(choice => {
         if (!choice || !choice[0]) return false;
         const cleanText = choice[0].replace(/(<.+?>)|(&#.+?;)/g, "");
@@ -684,17 +703,17 @@ async function selectMenuOption(choice, mod = 0) {
         const cleanText = c[0].replace(/(<.+?>)|(&#.+?;)/g, "");
         return cleanText === choice;
     });
-    
+
     if (!menuChoice) {
         throw new Error(`Menu option "${choice}" not found`);
     }
-    
+
     window.parent.postMessage({
         type: "forceMenuChoice",
         choice: menuChoice[0],
         mod: mod || 0
     }, "*");
-    
+
     await sleep(NUI_EXTRA_DELAY);
 }
 
@@ -703,7 +722,7 @@ async function submitValue(value) {
         type: "forceSubmitValue",
         value: value.toString()
     }, "*");
-    
+
     await sleep(NUI_EXTRA_DELAY);
 }
 
@@ -726,11 +745,11 @@ function log(message, type = "info") {
     entry.className = `log-entry ${type}`;
     entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
     logContent.insertBefore(entry, logContent.firstChild);
-    
+
     while (logContent.children.length > 100) {
         logContent.removeChild(logContent.lastChild);
     }
-    
+
     window.parent.postMessage({
         type: "notification",
         text: `~b~[Automation]~w~ ${message}`
