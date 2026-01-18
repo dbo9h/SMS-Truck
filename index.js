@@ -37,7 +37,26 @@ document.addEventListener("DOMContentLoaded", () => {
     loadSettings();
     setupEventListeners();
     log("Automation app loaded", "info");
-    window.parent.postMessage({ type: "automationReady" }, "*");
+    
+    // Request data from game client (critical for receiving pos_x, pos_y, pos_z)
+    setTimeout(() => {
+        window.parent.postMessage({ type: "getData" }, "*");
+        
+        // Register triggers for automation
+        window.parent.postMessage({
+            type: "registerTrigger",
+            trigger: "dtcdump",
+            name: "Auto Dump"
+        }, "*");
+        
+        window.parent.postMessage({
+            type: "registerTrigger",
+            trigger: "dtctake",
+            name: "Auto Take"
+        }, "*");
+        
+        log("Requested game data and registered triggers", "info");
+    }, 250);
 });
 
 function loadSettings() {
