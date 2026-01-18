@@ -1,50 +1,56 @@
-// Pure HTML/JS User App - No Lua Required
-// Works like doggo's trucking calculator
+// Pure HTML/JS User App - Works exactly like doggo's trucking calculator
 
 const state = {
     automationActive: false,
     executingActions: false,
+    automationLoop: false,
+    currentStep: null,
     cache: {
         menu_open: false,
         menu_choices: [],
         prompt: false,
         trigger_dtcdump: null,
         trigger_dtctake: null,
-        notification: null
+        trigger_dtcexecute: null,
+        trigger_dtccustom: null,
+        notification: null,
+        job: null,
+        keybindsEnabled: true
     },
     config: {
         autoDump: true,
-        autoTake: false,
+        autoTake: true,
         autoCloseMenu: true,
-        interactionDelay: 500
-    },
-    lastDumpTrigger: null,
-    lastTakeTrigger: null
+        interactionDelay: 500,
+        loopDelay: 2000,
+        storageCoords: null,
+        quarryCoords: null
+    }
 };
 
-// Constants
-const NUI_RETRIES = 50;
-const NUI_TIMEOUT = 100;
-const NUI_EXTRA_DELAY = 200;
+const NUI_RETRIES = 300;
+const NUI_TIMEOUT = 10;
+const NUI_EXTRA_DELAY = 10;
 
-// Initialize
 document.addEventListener("DOMContentLoaded", () => {
     loadSettings();
     setupEventListeners();
     log("Automation app loaded", "info");
-    
-    // Notify parent we're ready
-    window.parent.postMessage({
-        type: "automationReady"
-    }, "*");
+    window.parent.postMessage({ type: "automationReady" }, "*");
 });
 
-// Load settings from localStorage
 function loadSettings() {
     const saved = localStorage.getItem("automation_settings");
     if (saved) {
         try {
-            Object.assign(state.config, JSON.parse(saved));
+            const loaded = JSON.parse(saved);
+            Object.assign(state.config, loaded);
+            if (loaded.storageCoords && typeof loaded.storageCoords === 'object') {
+                state.config.storageCoords = loaded.storageCoords;
+            }
+            if (loaded.quarryCoords && typeof loaded.quarryCoords === 'object') {
+                state.config.quarryCoords = loaded.quarryCoords;
+            }
             updateUI();
         } catch (e) {
             console.error("Failed to load settings:", e);
@@ -52,20 +58,34 @@ function loadSettings() {
     }
 }
 
-// Save settings to localStorage
 function saveSettings() {
     localStorage.setItem("automation_settings", JSON.stringify(state.config));
 }
 
-// Update UI from state
 function updateUI() {
     document.getElementById("autoDump").checked = state.config.autoDump;
     document.getElementById("autoTake").checked = state.config.autoTake;
     document.getElementById("autoCloseMenu").checked = state.config.autoCloseMenu;
     document.getElementById("interactionDelay").value = state.config.interactionDelay;
+    if (document.getElementById("loopDelay")) {
+        document.getElementById("loopDelay").value = state.config.loopDelay;
+    }
+    updateCoordsDisplay();
 }
 
-// Setup event listeners
+function updateCoordsDisplay() {
+    const info = document.getElementById("coordsInfo");
+    if (info) {
+        const storage = state.config.storageCoords 
+            ? `${state.config.storageCoords.x}, ${state.config.storageCoords.y}, ${state.config.storageCoords.z}`
+            : "Not set";
+        const quarry = state.config.quarryCoords
+            ? `${state.config.quarryCoords.x}, ${state.config.quarryCoords.y}, ${state.config.quarryCoords.z}`
+            : "Not set";
+        info.innerHTML = `Storage: ${storage}<br>Quarry: ${quarry}`;
+    }
+}
+
 function setupEventListeners() {
     document.getElementById("autoDump").addEventListener("change", (e) => {
         state.config.autoDump = e.target.checked;
@@ -86,9 +106,16 @@ function setupEventListeners() {
         state.config.interactionDelay = parseInt(e.target.value);
         saveSettings();
     });
+    
+    const loopDelayEl = document.getElementById("loopDelay");
+    if (loopDelayEl) {
+        loopDelayEl.addEventListener("input", (e) => {
+            state.config.loopDelay = parseInt(e.target.value);
+            saveSettings();
+        });
+    }
 }
 
-// Toggle submenu
 function toggleSubmenu(header) {
     const content = header.nextElementSibling;
     const toggle = header.querySelector(".submenu-toggle");
@@ -102,7 +129,6 @@ function toggleSubmenu(header) {
     }
 }
 
-// Toggle automation
 function toggleAutomation() {
     state.automationActive = !state.automationActive;
     
@@ -111,58 +137,135 @@ function toggleAutomation() {
         statusEl.textContent = "Stop Automation";
         statusEl.parentElement.classList.add("active");
         log("Automation started", "info");
+        
+        if (state.config.storageCoords && state.config.quarryCoords) {
+            startAutomationLoop();
+        } else {
+            log("Set storage and quarry coordinates first!", "warn");
+        }
     } else {
         statusEl.textContent = "Start Automation";
         statusEl.parentElement.classList.remove("active");
+        state.automationLoop = false;
         log("Automation stopped", "info");
     }
 }
 
-// Clear log
+async function startAutomationLoop() {
+    if (state.automationLoop) return;
+    
+    state.automationLoop = true;
+    log("Starting automation loop...", "info");
+    
+    while (state.automationLoop && state.automationActive) {
+        try {
+            state.currentStep = "moving_to_storage";
+            log("Moving to storage...", "info");
+            await moveToLocation(state.config.storageCoords);
+            await sleep(state.config.loopDelay);
+            
+            state.currentStep = "dumping";
+            log("Dumping cargo...", "info");
+            await executeDump();
+            await sleep(state.config.loopDelay);
+            
+            state.currentStep = "moving_to_quarry";
+            log("Moving to quarry...", "info");
+            await moveToLocation(state.config.quarryCoords);
+            await sleep(state.config.loopDelay);
+            
+            state.currentStep = "collecting";
+            log("Collecting items...", "info");
+            await executeTake();
+            await sleep(state.config.loopDelay);
+            
+            log("Loop completed, starting again...", "success");
+            await sleep(state.config.loopDelay);
+            
+        } catch (error) {
+            log(`Loop error: ${error}`, "error");
+            await sleep(state.config.loopDelay * 2);
+        }
+    }
+    
+    state.currentStep = null;
+}
+
+async function moveToLocation(coords) {
+    if (!coords || !coords.x || !coords.y || !coords.z) {
+        throw new Error("Invalid coordinates");
+    }
+    
+    window.parent.postMessage({
+        type: "moveToLocation",
+        coords: { x: coords.x, y: coords.y, z: coords.z }
+    }, "*");
+    
+    await sleep(5000);
+}
+
+function setStorageCoords() {
+    const input = prompt("Enter Storage coordinates (format: x,y,z):\nExample: 100.0,200.0,30.0");
+    if (!input) return;
+    
+    const parts = input.split(",").map(s => parseFloat(s.trim()));
+    if (parts.length === 3 && !parts.some(isNaN)) {
+        state.config.storageCoords = { x: parts[0], y: parts[1], z: parts[2] };
+        saveSettings();
+        updateCoordsDisplay();
+        log(`Storage coordinates set: ${parts[0]}, ${parts[1]}, ${parts[2]}`, "success");
+    } else {
+        log("Invalid coordinates format. Use: x,y,z", "error");
+    }
+}
+
+function setQuarryCoords() {
+    const input = prompt("Enter Quarry coordinates (format: x,y,z):\nExample: 200.0,300.0,30.0");
+    if (!input) return;
+    
+    const parts = input.split(",").map(s => parseFloat(s.trim()));
+    if (parts.length === 3 && !parts.some(isNaN)) {
+        state.config.quarryCoords = { x: parts[0], y: parts[1], z: parts[2] };
+        saveSettings();
+        updateCoordsDisplay();
+        log(`Quarry coordinates set: ${parts[0]}, ${parts[1]}, ${parts[2]}`, "success");
+    } else {
+        log("Invalid coordinates format. Use: x,y,z", "error");
+    }
+}
+
 function clearLog() {
     document.getElementById("logContent").innerHTML = "";
 }
 
-// Listen for messages from game client
 window.addEventListener("message", (event) => {
     const data = event.data;
     
     if (!data || Object.keys(data).length === 0) return;
     
     try {
-        // Update cache
-        if (data.menu_choices !== undefined) {
-            state.cache.menu_choices = typeof data.menu_choices === "string" 
-                ? JSON.parse(data.menu_choices || "[]") 
-                : (data.menu_choices || []);
-        }
-        if (data.menu_open !== undefined) state.cache.menu_open = data.menu_open;
-        if (data.prompt !== undefined) state.cache.prompt = data.prompt;
-        if (data.notification !== undefined) state.cache.notification = data.notification;
-        
-        // Update status display
-        updateStatusDisplay();
-        
-        // Handle triggers (like doggo's app)
-        if (state.automationActive) {
-            if (data.trigger_dtcdump != null && data.trigger_dtcdump !== state.lastDumpTrigger) {
-                console.log(`nuiDump: ${data.trigger_dtcdump} ${typeof data.trigger_dtcdump} ${state.lastDumpTrigger} ${typeof state.lastDumpTrigger}`);
-                state.lastDumpTrigger = data.trigger_dtcdump;
+        if (state.cache.keybindsEnabled && state.cache.job === "trucker" && state.automationActive) {
+            if (data.trigger_dtcexecute != null && data.trigger_dtcexecute !== state.cache.trigger_dtcexecute) {
+                console.log(`nuiExecute: ${data.trigger_dtcexecute} ${typeof data.trigger_dtcexecute} ${state.cache.trigger_dtcexecute} ${typeof state.cache.trigger_dtcexecute}`);
+                state.cache.trigger_dtcexecute = data.trigger_dtcexecute;
+            } else if (data.trigger_dtcdump != null && data.trigger_dtcdump !== state.cache.trigger_dtcdump) {
+                console.log(`nuiDump: ${data.trigger_dtcdump} ${typeof data.trigger_dtcdump} ${state.cache.trigger_dtcdump} ${typeof state.cache.trigger_dtcdump}`);
+                state.cache.trigger_dtcdump = data.trigger_dtcdump;
                 if (state.config.autoDump) {
                     executeDump();
                 }
-            }
-            
-            if (data.trigger_dtctake != null && data.trigger_dtctake !== state.lastTakeTrigger) {
-                console.log(`nuiTake: ${data.trigger_dtctake} ${typeof data.trigger_dtctake} ${state.lastTakeTrigger} ${typeof state.lastTakeTrigger}`);
-                state.lastTakeTrigger = data.trigger_dtctake;
+            } else if (data.trigger_dtctake != null && data.trigger_dtctake !== state.cache.trigger_dtctake) {
+                console.log(`nuiTake: ${data.trigger_dtctake} ${typeof data.trigger_dtctake} ${state.cache.trigger_dtctake} ${typeof state.cache.trigger_dtctake}`);
+                state.cache.trigger_dtctake = data.trigger_dtctake;
                 if (state.config.autoTake) {
                     executeTake();
                 }
+            } else if (data.trigger_dtccustom != null && data.trigger_dtccustom !== state.cache.trigger_dtccustom) {
+                console.log(`nuiCustom: ${data.trigger_dtccustom} ${typeof data.trigger_dtccustom} ${state.cache.trigger_dtccustom} ${typeof state.cache.trigger_dtccustom}`);
+                state.cache.trigger_dtccustom = data.trigger_dtccustom;
             }
         }
         
-        // Store all cache values
         for (let [key, value] of Object.entries(data)) {
             if (key === "menu_choices") {
                 state.cache[key] = typeof value === "string" ? JSON.parse(value || "[]") : (value || []);
@@ -170,128 +273,196 @@ window.addEventListener("message", (event) => {
                 state.cache[key] = value;
             }
         }
+        
+        updateStatusDisplay();
+        
     } catch (error) {
         console.error("Error handling message:", error);
     }
 });
 
-// Update status display
 function updateStatusDisplay() {
-    document.getElementById("menuStatus").textContent = state.cache.menu_open ? "Yes" : "No";
-    document.getElementById("executingStatus").textContent = state.executingActions ? "Yes" : "No";
+    const menuStatus = document.getElementById("menuStatus");
+    const executingStatus = document.getElementById("executingStatus");
+    const lastAction = document.getElementById("lastAction");
+    
+    if (menuStatus) menuStatus.textContent = state.cache.menu_open ? "Yes" : "No";
+    if (executingStatus) executingStatus.textContent = state.executingActions ? "Yes" : "No";
+    
+    if (lastAction && state.currentStep) {
+        const stepNames = {
+            "moving_to_storage": "Moving to Storage",
+            "dumping": "Dumping",
+            "moving_to_quarry": "Moving to Quarry",
+            "collecting": "Collecting"
+        };
+        lastAction.textContent = stepNames[state.currentStep] || "None";
+    }
 }
 
-// Execute dump action (like doggo's Fe function)
 async function executeDump() {
     if (state.executingActions) {
         log("Already executing actions, skipping dump...", "warn");
-        return;
+        return false;
     }
     
-    log("Executing dump action...", "info");
+    console.log("Executing NUI dump...");
     document.getElementById("lastAction").textContent = "Dump";
     
     try {
         state.executingActions = true;
+        const dumpActions = buildDumpActions();
         
-        // Wait for menu to open
-        await waitFor(() => state.cache.menu_open, NUI_RETRIES, NUI_TIMEOUT);
-        
-        // Find dump option (common names)
-        const dumpOptions = ["Dump Cargo", "Dump", "Empty Trunk", "Dump Items"];
-        let dumpOption = null;
-        
-        for (const option of dumpOptions) {
-            if (hasMenuOption(option)) {
-                dumpOption = option;
-                break;
-            }
+        if (!dumpActions || dumpActions.length === 0) {
+            log("No valid actions to execute", "error");
+            return false;
         }
         
-        if (!dumpOption) {
-            log("Dump option not found in menu", "error");
-            return;
+        const success = await executeActions(dumpActions, true);
+        
+        if (success) {
+            log("Successfully executed dump actions", "success");
+            return true;
+        } else {
+            log("Dump actions failed", "error");
+            return false;
         }
-        
-        // Select dump option
-        await selectMenuOption(dumpOption, 0);
-        
-        // Wait for prompt if needed
-        if (state.cache.prompt) {
-            await waitFor(() => state.cache.prompt, NUI_RETRIES, NUI_TIMEOUT);
-            await submitValue(999999); // Max amount
-        }
-        
-        // Close menu if configured
-        if (state.config.autoCloseMenu && state.cache.menu_open) {
-            await sleep(NUI_EXTRA_DELAY);
-            await closeMenu();
-        }
-        
-        log("Dump action completed", "success");
     } catch (error) {
-        log(`Dump action failed: ${error}`, "error");
+        log(`Error in dump: ${error?.message || error}`, "error");
+        console.error("Error in executeDump:", error);
+        return false;
     } finally {
         state.executingActions = false;
     }
 }
 
-// Execute take action (like doggo's Ve function)
+function buildDumpActions() {
+    const dumpPaths = [
+        [{ action: "Dump from Trunk", mod: 0 }],
+        [{ action: "Dump Cargo", mod: 0 }],
+        [{ action: "Empty Trunk", mod: 0 }],
+        [{ action: "Dump", mod: 0 }]
+    ];
+    
+    for (const path of dumpPaths) {
+        if (hasMenuOption(path[0].action)) {
+            return [{ actions: path, amount: 0 }];
+        }
+    }
+    
+    return [];
+}
+
 async function executeTake() {
     if (state.executingActions) {
         log("Already executing actions, skipping take...", "warn");
-        return;
+        return false;
     }
     
-    log("Executing take action...", "info");
+    console.log("Executing NUI take...");
     document.getElementById("lastAction").textContent = "Take";
     
     try {
         state.executingActions = true;
+        const takeActions = buildTakeActions();
         
-        // Wait for menu to open
-        await waitFor(() => state.cache.menu_open, NUI_RETRIES, NUI_TIMEOUT);
-        
-        // Find take option (common names)
-        const takeOptions = ["Take to Trunk", "Take", "Load to Trunk", "Store in Trunk"];
-        let takeOption = null;
-        
-        for (const option of takeOptions) {
-            if (hasMenuOption(option)) {
-                takeOption = option;
-                break;
-            }
+        if (!takeActions || takeActions.length === 0) {
+            log("No valid actions to execute", "error");
+            return false;
         }
         
-        if (!takeOption) {
-            log("Take option not found in menu", "error");
-            return;
+        const success = await executeActions(takeActions, true);
+        
+        if (success) {
+            log("Successfully executed take actions", "success");
+            return true;
+        } else {
+            log("Take actions failed", "error");
+            return false;
         }
-        
-        // Select take option
-        await selectMenuOption(takeOption, 0);
-        
-        // Wait for prompt if needed
-        if (state.cache.prompt) {
-            await waitFor(() => state.cache.prompt, NUI_RETRIES, NUI_TIMEOUT);
-            await submitValue(999999); // Max amount
-        }
-        
-        // Close menu if configured
-        if (state.config.autoCloseMenu && state.cache.menu_open) {
-            await sleep(NUI_EXTRA_DELAY);
-            await closeMenu();
-        }
-        
-        log("Take action completed", "success");
     } catch (error) {
-        log(`Take action failed: ${error}`, "error");
+        log(`Error in take: ${error?.message || error}`, "error");
+        console.error("Error in executeTake:", error);
+        return false;
     } finally {
         state.executingActions = false;
     }
 }
 
-// Wait for condition (like doggo's Ue function)
+function buildTakeActions() {
+    const takePaths = [
+        [{ action: "Take to Trunk", mod: 0 }],
+        [{ action: "Take", mod: 0 }],
+        [{ action: "Load to Trunk", mod: 0 }],
+        [{ action: "Store in Trunk", mod: 0 }]
+    ];
+    
+    for (const path of takePaths) {
+        if (hasMenuOption(path[0].action)) {
+            return [{ actions: path, amount: 0 }];
+        }
+    }
+    
+    return [];
+}
+
+async function executeActions(actions, closeMenu = true) {
+    try {
+        if (state.executingActions && !closeMenu) {
+            throw new Error("Already executing NUI actions");
+        }
+        
+        state.executingActions = true;
+        
+        for (const actionSet of actions) {
+            for (const action of actionSet.actions) {
+                await waitFor(() => {
+                    return state.cache.menu_open && 
+                           (state.cache.menu_choices ?? []).findIndex(choice => {
+                               if (!choice || !choice[0]) return false;
+                               const cleanText = choice[0].replace(/(<.+?>)|(&#.+?;)/g, "");
+                               return cleanText === action.action;
+                           }) !== -1;
+                }, NUI_RETRIES, NUI_TIMEOUT);
+                
+                const menuChoice = state.cache.menu_choices.find(choice => {
+                    if (!choice || !choice[0]) return false;
+                    const cleanText = choice[0].replace(/(<.+?>)|(&#.+?;)/g, "");
+                    return cleanText === action.action;
+                });
+                
+                if (menuChoice) {
+                    await selectMenuOption(menuChoice[0], action.mod || 0);
+                }
+            }
+            
+            if (actionSet.amount > 0) {
+                await waitFor(() => state.cache.prompt === true, NUI_RETRIES, NUI_TIMEOUT);
+                await submitValue(actionSet.amount);
+            }
+            
+            await sleep(NUI_EXTRA_DELAY);
+            
+            if (closeMenu && state.cache.menu_open) {
+                await closeMenu();
+            }
+        }
+        
+        await sleep(NUI_TIMEOUT);
+        if (closeMenu && state.cache.menu_open) {
+            await closeMenu();
+        }
+        
+        return true;
+    } catch (error) {
+        log(`Error in executeActions: ${error?.message || error}`, "error");
+        console.error("Error in executeActions:", error);
+        return false;
+    } finally {
+        state.executingActions = false;
+    }
+}
+
 function waitFor(condition, retries = NUI_RETRIES, timeout = NUI_TIMEOUT) {
     return new Promise((resolve, reject) => {
         let attempts = 0;
@@ -308,7 +479,6 @@ function waitFor(condition, retries = NUI_RETRIES, timeout = NUI_TIMEOUT) {
     });
 }
 
-// Check if menu has option (like doggo's menu matching)
 function hasMenuOption(text) {
     if (!state.cache.menu_choices || !Array.isArray(state.cache.menu_choices)) {
         return false;
@@ -316,15 +486,12 @@ function hasMenuOption(text) {
     
     return state.cache.menu_choices.some(choice => {
         if (!choice || !choice[0]) return false;
-        // Strip HTML tags and entities (like doggo does)
         const cleanText = choice[0].replace(/(<.+?>)|(&#.+?;)/g, "");
         return cleanText === text;
     });
 }
 
-// Select menu option (like doggo's Nr function)
 async function selectMenuOption(choice, mod = 0) {
-    // Find the exact menu choice
     const menuChoice = state.cache.menu_choices.find(c => {
         if (!c || !c[0]) return false;
         const cleanText = c[0].replace(/(<.+?>)|(&#.+?;)/g, "");
@@ -335,7 +502,6 @@ async function selectMenuOption(choice, mod = 0) {
         throw new Error(`Menu option "${choice}" not found`);
     }
     
-    // Send menu choice (like doggo's forceMenuChoice)
     window.parent.postMessage({
         type: "forceMenuChoice",
         choice: menuChoice[0],
@@ -345,7 +511,6 @@ async function selectMenuOption(choice, mod = 0) {
     await sleep(NUI_EXTRA_DELAY);
 }
 
-// Submit value (like doggo's _r function)
 async function submitValue(value) {
     window.parent.postMessage({
         type: "forceSubmitValue",
@@ -355,7 +520,6 @@ async function submitValue(value) {
     await sleep(NUI_EXTRA_DELAY);
 }
 
-// Close menu (like doggo's q function)
 async function closeMenu() {
     if (state.executingActions) {
         window.parent.postMessage({
@@ -365,12 +529,10 @@ async function closeMenu() {
     }
 }
 
-// Sleep helper
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Log message (like doggo's E function but for console)
 function log(message, type = "info") {
     const logContent = document.getElementById("logContent");
     const entry = document.createElement("div");
@@ -378,19 +540,18 @@ function log(message, type = "info") {
     entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
     logContent.insertBefore(entry, logContent.firstChild);
     
-    // Keep only last 100 entries
     while (logContent.children.length > 100) {
         logContent.removeChild(logContent.lastChild);
     }
     
-    // Also send notification to game (like doggo)
     window.parent.postMessage({
         type: "notification",
         text: `~b~[Automation]~w~ ${message}`
     }, "*");
 }
 
-// Make functions available globally (like doggo does)
 window.toggleAutomation = toggleAutomation;
 window.clearLog = clearLog;
 window.toggleSubmenu = toggleSubmenu;
+window.setStorageCoords = setStorageCoords;
+window.setQuarryCoords = setQuarryCoords;

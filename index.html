@@ -38,6 +38,25 @@
                             Interaction Delay (ms):
                             <input type="number" id="interactionDelay" value="500" min="100" max="2000" step="100">
                         </label>
+                        <label for="loopDelay">
+                            Loop Delay (ms):
+                            <input type="number" id="loopDelay" value="2000" min="500" max="10000" step="500">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Coordinates -->
+                <div class="submenu">
+                    <div class="submenu-header" onclick="toggleSubmenu(this)">
+                        Coordinates <span class="submenu-toggle">▼</span>
+                    </div>
+                    <div class="submenu-content">
+                        <button onclick="setStorageCoords()">Set Storage Coords</button>
+                        <button onclick="setQuarryCoords()">Set Quarry Coords</button>
+                        <div id="coordsInfo" style="margin-top: 10px; font-size: 11px; color: #aaa;">
+                            Storage: Not set<br>
+                            Quarry: Not set
+                        </div>
                     </div>
                 </div>
 
