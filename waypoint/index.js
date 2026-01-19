@@ -9,7 +9,7 @@ const state = {
     checkInterval: null
 };
 
-const ARRIVAL_DISTANCE = 50; // Distance in units to consider "arrived" (increased for more range)
+const ARRIVAL_DISTANCE = 30; // Distance in units to consider "arrived" (increased for more range)
 const CHECK_INTERVAL = 1000; // Check distance every 1 second
 
 // OLED Protection
@@ -497,3 +497,4 @@ function updateMiniInfo() {
         }
     }
 }
+
