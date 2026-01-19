@@ -12,9 +12,19 @@ const state = {
 const ARRIVAL_DISTANCE = 10; // Distance in units to consider "arrived"
 const CHECK_INTERVAL = 1000; // Check distance every 1 second
 
+// Drag functionality
+let isDragging = false;
+let currentX;
+let currentY;
+let initialX;
+let initialY;
+let xOffset = 0;
+let yOffset = 0;
+
 // Initialize app
 document.addEventListener("DOMContentLoaded", () => {
     loadSettings();
+    setupDragListeners();
     log("Waypoint Toggle app loaded", "info");
 
     // Request data from game
@@ -23,6 +33,48 @@ document.addEventListener("DOMContentLoaded", () => {
         log("Requested game data", "info");
     }, 250);
 });
+
+// Setup drag listeners
+function setupDragListeners() {
+    const container = document.querySelector(".container");
+
+    container.addEventListener("mousedown", dragStart);
+    document.addEventListener("mousemove", drag);
+    document.addEventListener("mouseup", dragEnd);
+}
+
+function dragStart(e) {
+    // Only drag if clicking on header or container background
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') {
+        return;
+    }
+
+    initialX = e.clientX - xOffset;
+    initialY = e.clientY - yOffset;
+    isDragging = true;
+}
+
+function drag(e) {
+    if (isDragging) {
+        e.preventDefault();
+        currentX = e.clientX - initialX;
+        currentY = e.clientY - initialY;
+        xOffset = currentX;
+        yOffset = currentY;
+
+        setTranslate(currentX, currentY, document.querySelector(".container"));
+    }
+}
+
+function dragEnd(e) {
+    initialX = currentX;
+    initialY = currentY;
+    isDragging = false;
+}
+
+function setTranslate(xPos, yPos, el) {
+    el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+}
 
 // Load saved coordinates from localStorage
 function loadSettings() {
