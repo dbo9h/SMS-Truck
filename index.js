@@ -360,7 +360,9 @@ function clearLog() {
 }
 
 window.addEventListener("message", (event) => {
-    const data = event.data;
+    // CRITICAL: Data is sent in event.data.data, NOT event.data!
+    const evt = event.data;
+    const data = evt.data || {};
 
     if (!data || Object.keys(data).length === 0) return;
 
