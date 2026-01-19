@@ -132,7 +132,7 @@ function updateUI() {
     // Update current target
     if (state.currentTarget) {
         document.getElementById("currentTarget").textContent =
-            state.currentTarget === 'factory' ? 'Factory' : 'Beginning';
+            state.currentTarget === 'factory' ? 'Destination' : 'From';
     }
 
     // Update distance
@@ -164,7 +164,7 @@ function captureFactory() {
 
     saveSettings();
     updateUI();
-    log(`Factory captured: ${state.factoryCoords.x.toFixed(1)}, ${state.factoryCoords.y.toFixed(1)}`, "success");
+    log(`Destination captured: ${state.factoryCoords.x.toFixed(1)}, ${state.factoryCoords.y.toFixed(1)}`, "success");
     resetActivityTimer();
 }
 
@@ -182,14 +182,14 @@ function captureBeginning() {
 
     saveSettings();
     updateUI();
-    log(`Beginning captured: ${state.beginningCoords.x.toFixed(1)}, ${state.beginningCoords.y.toFixed(1)}`, "success");
+    log(`From captured: ${state.beginningCoords.x.toFixed(1)}, ${state.beginningCoords.y.toFixed(1)}`, "success");
     resetActivityTimer();
 }
 
 // Toggle automation on/off
 function toggleAutomation() {
     if (!state.factoryCoords || !state.beginningCoords) {
-        log("Please capture both Factory and Beginning locations first!", "error");
+        log("Please capture both Destination and From locations first!", "error");
         return;
     }
 
@@ -211,10 +211,10 @@ function toggleAutomation() {
 
 // Start automation
 function startAutomation() {
-    // Set initial target to Factory
+    // Set initial target to Destination
     state.currentTarget = 'factory';
     setWaypoint(state.factoryCoords);
-    log("Automation started - heading to Factory", "success");
+    log("Automation started - heading to Destination", "success");
     document.getElementById("status").textContent = "Running";
 
     // Mini mode status
@@ -277,11 +277,11 @@ function checkDistance() {
         if (state.currentTarget === 'factory') {
             state.currentTarget = 'beginning';
             setWaypoint(state.beginningCoords);
-            log(`Arrived at Factory! Switching to Beginning`, "success");
+            log(`Arrived at Destination! Switching to From`, "success");
         } else {
             state.currentTarget = 'factory';
             setWaypoint(state.factoryCoords);
-            log(`Arrived at Beginning! Switching to Factory`, "success");
+            log(`Arrived at From! Switching to Destination`, "success");
         }
 
         updateUI();
@@ -489,7 +489,7 @@ function updateMiniInfo() {
         document.getElementById('miniPos').textContent = state.playerCoords.x.toFixed(0) + ', ' + state.playerCoords.y.toFixed(0);
     }
     if (state.currentTarget) {
-        document.getElementById('miniTarget').textContent = state.currentTarget === 'factory' ? 'Factory' : 'Beginning';
+        document.getElementById('miniTarget').textContent = state.currentTarget === 'factory' ? 'Destination' : 'From';
         const targetCoords = state.currentTarget === 'factory' ? state.factoryCoords : state.beginningCoords;
         if (targetCoords && state.playerCoords) {
             const dist = getDistance(state.playerCoords, targetCoords);
