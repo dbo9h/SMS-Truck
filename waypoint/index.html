@@ -11,8 +11,7 @@
 <body>
     <div id="main">
         <div class="container">
-            <h1>Waypoint Toggle <button onclick="toggleMiniMode()" class="mini-toggle"
-                    title="Toggle Mini Mode">⇄</button></h1>
+            <h1>Waypoint Toggle <button onclick="toggleMiniMode()" class="mini-toggle" title="Toggle Mini Mode">⇄</button></h1>            
             <!-- Mini Mode Info (shown only in mini mode) -->
             <div class="mini-info">
                 <div class="mini-info-item status-idle" id="miniStatus">
@@ -54,11 +53,6 @@
                 <button onclick="toggleAutomation()" id="automationBtn" class="btn-automation">
                     ▶️ Start Automation
                 </button>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
-                    <button onclick="walkToFactory()" class="btn-walk">🚶 Walk to Factory</button>
-                    <button onclick="walkToBeginning()" class="btn-walk">🚶 Walk to Beginning</button>
-                </div>
-                <button onclick="stopWalking()" class="btn-stop-walk" style="margin-bottom: 12px;">⏹️ Stop Walking</button>
                 <div class="status">
                     <div>Current Target: <span id="currentTarget">None</span></div>
                     <div>Distance: <span id="distance">-</span></div>
