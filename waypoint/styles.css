@@ -336,6 +336,13 @@ button {
     pointer-events: all;
 }
 
+/* Fully hidden when toggled via F2 */
+.container.manual-hidden {
+    display: none !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
 /* Mini Mode */
 .mini-info {
     display: none;

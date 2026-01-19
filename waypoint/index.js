@@ -16,6 +16,7 @@ const CHECK_INTERVAL = 1000; // Check distance every 1 second
 let autoHideTimer = null;
 let positionShiftTimer = null;
 let lastActivityTime = Date.now();
+let uiManuallyHidden = false; // true when user hides UI via F2
 const AUTO_HIDE_DELAY = 30000; // 30 seconds
 const POSITION_SHIFT_INTERVAL = 300000; // 5 minutes
 
@@ -358,7 +359,9 @@ function updateOpacity(value) {
 
 function toggleAutoHide(enabled) {
     if (enabled) {
-        startAutoHideTimer();
+        if (!uiManuallyHidden) {
+            startAutoHideTimer();
+        }
         log("Auto-hide enabled (30s idle)", "info");
     } else {
         stopAutoHideTimer();
@@ -381,10 +384,12 @@ function togglePositionShift(enabled) {
 
 function resetActivityTimer() {
     lastActivityTime = Date.now();
-    showUI();
-
-    if (document.getElementById("autoHide") && document.getElementById("autoHide").checked) {
-        startAutoHideTimer();
+    // Do not auto-show UI if the user manually hid it with F2
+    if (!uiManuallyHidden) {
+        showUI();
+        if (document.getElementById("autoHide") && document.getElementById("autoHide").checked) {
+            startAutoHideTimer();
+        }
     }
 }
 
@@ -407,11 +412,18 @@ function stopAutoHideTimer() {
 
 function hideUI() {
     const container = document.querySelector(".container");
-    container.classList.add("fading", "hidden");
+    if (uiManuallyHidden) {
+        container.classList.add("manual-hidden");
+        container.classList.remove("fading", "hidden");
+    } else {
+        container.classList.add("fading", "hidden");
+        container.classList.remove("manual-hidden");
+    }
 }
 
 function showUI() {
     const container = document.querySelector(".container");
+    container.classList.remove("manual-hidden");
     container.classList.remove("hidden");
     setTimeout(() => container.classList.remove("fading"), 500);
 }
@@ -462,6 +474,32 @@ function loadOLEDSettings() {
 document.addEventListener("mousemove", resetActivityTimer);
 document.addEventListener("mousedown", resetActivityTimer);
 document.addEventListener("keypress", resetActivityTimer);
+
+// Keyboard shortcut: F2 to toggle UI visibility
+window.addEventListener("keydown", (e) => {
+    const isF2 = e.key === "F2" || e.code === "F2" || e.key === "f2";
+    if (!isF2) return;
+
+    e.preventDefault();
+    const container = document.querySelector(".container");
+    if (!container) return;
+
+    // Toggle manual hide state; this sits on top of auto-hide
+    if (uiManuallyHidden) {
+        uiManuallyHidden = false;
+        showUI();
+        // Resume auto-hide behavior if enabled
+        if (document.getElementById("autoHide") && document.getElementById("autoHide").checked) {
+            startAutoHideTimer();
+        }
+        lastActivityTime = Date.now();
+    } else {
+        uiManuallyHidden = true;
+        hideUI();
+        // While manually hidden, never auto-show
+        stopAutoHideTimer();
+    }
+});
 
 
 // ========== Mini Mode ==========
