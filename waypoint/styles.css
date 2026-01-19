@@ -377,6 +377,36 @@ button {
     color: #f44336;
 }
 
+.mini-actions {
+    display: none;
+    margin-top: 8px;
+    gap: 8px;
+}
+
+.mini-action-btn {
+    width: auto;
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #1f1f1f;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.mini-action-btn:hover {
+    background: #2a2a2a;
+    border-color: #666;
+}
+
+.mini-action-btn:active {
+    transform: scale(0.98);
+}
+
 .container.mini-mode {
     width: 260px;
     max-height: none;
@@ -394,5 +424,9 @@ button {
 }
 
 .container.mini-mode .mini-info {
+    display: flex;
+}
+
+.container.mini-mode .mini-actions {
     display: flex;
 }
