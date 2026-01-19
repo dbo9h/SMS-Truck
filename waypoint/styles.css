@@ -41,6 +41,7 @@ html {
     max-height: 90vh;
     overflow-y: auto;
     cursor: move;
+    transition: opacity 0.3s ease;
 }
 
 .container::-webkit-scrollbar {
@@ -67,6 +68,30 @@ h1 {
     margin-bottom: 20px;
     font-size: 24px;
     cursor: move;
+}
+
+.mini-toggle {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    margin-left: 8px;
+    border-radius: 6px;
+    background: #1f1f1f;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.mini-toggle:hover {
+    background: #2a2a2a;
+    border-color: #666;
+}
+
+.mini-toggle:active {
+    transform: scale(0.96);
 }
 
 h2 {
@@ -219,7 +244,6 @@ button {
     color: #f44336;
 }
 
-/* Scrollbar styling for log */
 .log::-webkit-scrollbar {
     width: 6px;
 }
@@ -236,4 +260,139 @@ button {
 
 .log::-webkit-scrollbar-thumb:hover {
     background: rgba(74, 158, 255, 0.7);
+}
+
+/* OLED Protection Controls */
+.oled-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.oled-controls label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.oled-controls input[type="range"] {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.oled-controls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #0d47a1;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.oled-controls input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #0d47a1;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.oled-controls input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #0d47a1;
+}
+
+#opacityValue {
+    min-width: 40px;
+    text-align: right;
+    color: #90caf9;
+    font-weight: 600;
+}
+
+/* Fade animation for auto-hide */
+.container.fading {
+    transition: opacity 0.5s ease-out;
+}
+
+.container.hidden {
+    opacity: 0.1;
+    pointer-events: none;
+}
+
+.container.hidden:hover {
+    opacity: 0.9;
+    pointer-events: all;
+}
+
+/* Mini Mode */
+.mini-info {
+    display: none;
+    margin-bottom: 10px;
+    padding: 8px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid #555;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+}
+
+.mini-info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mini-info-item .label {
+    font-weight: 600;
+    color: #90caf9;
+    margin-right: 6px;
+}
+
+.mini-info-item .value {
+    font-family: 'Courier New', monospace;
+}
+
+.mini-info-item.status-idle .value {
+    color: #ffeb3b;
+}
+
+.mini-info-item.status-running .value {
+    color: #4caf50;
+}
+
+.mini-info-item.status-error .value {
+    color: #f44336;
+}
+
+.container.mini-mode {
+    width: 260px;
+    max-height: none;
+    overflow: hidden;
+    cursor: default;
+}
+
+.container.mini-mode h1 {
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+.container.mini-mode .section {
+    display: none;
+}
+
+.container.mini-mode .mini-info {
+    display: flex;
 }

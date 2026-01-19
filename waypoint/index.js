@@ -9,8 +9,15 @@ const state = {
     checkInterval: null
 };
 
-const ARRIVAL_DISTANCE = 10; // Distance in units to consider "arrived"
+const ARRIVAL_DISTANCE = 50; // Distance in units to consider "arrived" (increased for more range)
 const CHECK_INTERVAL = 1000; // Check distance every 1 second
+
+// OLED Protection
+let autoHideTimer = null;
+let positionShiftTimer = null;
+let lastActivityTime = Date.now();
+const AUTO_HIDE_DELAY = 30000; // 30 seconds
+const POSITION_SHIFT_INTERVAL = 300000; // 5 minutes
 
 // Drag functionality
 let isDragging = false;
@@ -24,6 +31,8 @@ let yOffset = 0;
 // Initialize app
 document.addEventListener("DOMContentLoaded", () => {
     loadSettings();
+    loadOLEDSettings();
+    loadMiniMode();
     setupDragListeners();
     log("Waypoint Toggle app loaded", "info");
 
@@ -52,6 +61,7 @@ function dragStart(e) {
     initialX = e.clientX - xOffset;
     initialY = e.clientY - yOffset;
     isDragging = true;
+    resetActivityTimer();
 }
 
 function drag(e) {
@@ -133,6 +143,11 @@ function updateUI() {
             document.getElementById("distance").textContent = dist.toFixed(1) + " units";
         }
     }
+
+    // Update mini mode info panel
+    if (typeof updateMiniInfo === "function") {
+        updateMiniInfo();
+    }
 }
 
 // Capture factory location
@@ -150,6 +165,7 @@ function captureFactory() {
     saveSettings();
     updateUI();
     log(`Factory captured: ${state.factoryCoords.x.toFixed(1)}, ${state.factoryCoords.y.toFixed(1)}`, "success");
+    resetActivityTimer();
 }
 
 // Capture beginning location
@@ -167,6 +183,7 @@ function captureBeginning() {
     saveSettings();
     updateUI();
     log(`Beginning captured: ${state.beginningCoords.x.toFixed(1)}, ${state.beginningCoords.y.toFixed(1)}`, "success");
+    resetActivityTimer();
 }
 
 // Toggle automation on/off
@@ -189,6 +206,7 @@ function toggleAutomation() {
         btn.classList.remove("active");
         stopAutomation();
     }
+    resetActivityTimer();
 }
 
 // Start automation
@@ -198,6 +216,15 @@ function startAutomation() {
     setWaypoint(state.factoryCoords);
     log("Automation started - heading to Factory", "success");
     document.getElementById("status").textContent = "Running";
+
+    // Mini mode status
+    const miniStatus = document.getElementById("miniStatus");
+    const miniStatusValue = document.getElementById("miniStatusValue");
+    if (miniStatus && miniStatusValue) {
+        miniStatus.classList.remove("status-idle");
+        miniStatus.classList.add("status-running");
+        miniStatusValue.textContent = "Running";
+    }
 
     // Start checking distance
     state.checkInterval = setInterval(checkDistance, CHECK_INTERVAL);
@@ -215,6 +242,23 @@ function stopAutomation() {
     document.getElementById("status").textContent = "Idle";
     document.getElementById("currentTarget").textContent = "None";
     document.getElementById("distance").textContent = "-";
+
+    // Mini mode reset
+    const miniStatus = document.getElementById("miniStatus");
+    const miniStatusValue = document.getElementById("miniStatusValue");
+    if (miniStatus && miniStatusValue) {
+        miniStatus.classList.remove("status-running");
+        miniStatus.classList.add("status-idle");
+        miniStatusValue.textContent = "Idle";
+    }
+    const miniTarget = document.getElementById("miniTarget");
+    const miniDistance = document.getElementById("miniDistance");
+    const miniPos = document.getElementById("miniPos");
+    if (miniTarget) miniTarget.textContent = "None";
+    if (miniDistance) miniDistance.textContent = "-";
+    if (miniPos && state.playerCoords) {
+        miniPos.textContent = state.playerCoords.x.toFixed(0) + ", " + state.playerCoords.y.toFixed(0);
+    }
 }
 
 // Check distance and switch waypoint when arrived
@@ -299,4 +343,157 @@ function log(message, type = "info") {
 // Clear log
 function clearLog() {
     document.getElementById("log").innerHTML = "";
+    resetActivityTimer();
+}
+
+// ========== OLED Protection Functions ==========
+
+function updateOpacity(value) {
+    const container = document.querySelector(".container");
+    container.style.opacity = value / 100;
+    document.getElementById("opacityValue").textContent = value + "%";
+    localStorage.setItem("uiOpacity", value);
+    resetActivityTimer();
+}
+
+function toggleAutoHide(enabled) {
+    if (enabled) {
+        startAutoHideTimer();
+        log("Auto-hide enabled (30s idle)", "info");
+    } else {
+        stopAutoHideTimer();
+        showUI();
+        log("Auto-hide disabled", "info");
+    }
+    localStorage.setItem("autoHide", enabled);
+}
+
+function togglePositionShift(enabled) {
+    if (enabled) {
+        startPositionShift();
+        log("Position shift enabled (5min)", "info");
+    } else {
+        stopPositionShift();
+        log("Position shift disabled", "info");
+    }
+    localStorage.setItem("positionShift", enabled);
+}
+
+function resetActivityTimer() {
+    lastActivityTime = Date.now();
+    showUI();
+
+    if (document.getElementById("autoHide") && document.getElementById("autoHide").checked) {
+        startAutoHideTimer();
+    }
+}
+
+function startAutoHideTimer() {
+    stopAutoHideTimer();
+    autoHideTimer = setInterval(() => {
+        const idleTime = Date.now() - lastActivityTime;
+        if (idleTime >= AUTO_HIDE_DELAY) {
+            hideUI();
+        }
+    }, 1000);
+}
+
+function stopAutoHideTimer() {
+    if (autoHideTimer) {
+        clearInterval(autoHideTimer);
+        autoHideTimer = null;
+    }
+}
+
+function hideUI() {
+    const container = document.querySelector(".container");
+    container.classList.add("fading", "hidden");
+}
+
+function showUI() {
+    const container = document.querySelector(".container");
+    container.classList.remove("hidden");
+    setTimeout(() => container.classList.remove("fading"), 500);
+}
+
+function startPositionShift() {
+    stopPositionShift();
+    positionShiftTimer = setInterval(() => {
+        shiftPosition();
+    }, POSITION_SHIFT_INTERVAL);
+}
+
+function stopPositionShift() {
+    if (positionShiftTimer) {
+        clearInterval(positionShiftTimer);
+        positionShiftTimer = null;
+    }
+}
+
+function shiftPosition() {
+    // Shift position by 5-15 pixels randomly to prevent burn-in
+    const shiftX = Math.floor(Math.random() * 10) - 5;
+    const shiftY = Math.floor(Math.random() * 10) - 5;
+
+    xOffset += shiftX;
+    yOffset += shiftY;
+
+    setTranslate(xOffset, yOffset, document.querySelector(".container"));
+    log(`Position shifted (${shiftX}, ${shiftY}) for OLED protection`, "info");
+}
+
+// Load OLED settings
+function loadOLEDSettings() {
+    const opacity = localStorage.getItem("uiOpacity") || "90";
+    const autoHide = localStorage.getItem("autoHide") === "true";
+    const positionShift = localStorage.getItem("positionShift") === "true";
+
+    document.getElementById("opacitySlider").value = opacity;
+    updateOpacity(opacity);
+
+    document.getElementById("autoHide").checked = autoHide;
+    if (autoHide) toggleAutoHide(true);
+
+    document.getElementById("positionShift").checked = positionShift;
+    if (positionShift) togglePositionShift(true);
+}
+
+// Track user activity
+document.addEventListener("mousemove", resetActivityTimer);
+document.addEventListener("mousedown", resetActivityTimer);
+document.addEventListener("keypress", resetActivityTimer);
+
+
+// ========== Mini Mode ==========
+
+function toggleMiniMode() {
+    const container = document.querySelector('.container');
+    const isMini = container.classList.toggle('mini-mode');
+    localStorage.setItem('miniMode', isMini);
+    log(isMini ? 'Mini mode enabled' : 'Mini mode disabled', 'info');
+    if (typeof updateMiniInfo === 'function') {
+        updateMiniInfo();
+    }
+    if (typeof resetActivityTimer === 'function') resetActivityTimer();
+}
+
+function loadMiniMode() {
+    const isMini = localStorage.getItem('miniMode') === 'true';
+    if (isMini) {
+        document.querySelector('.container').classList.add('mini-mode');
+    }
+}
+
+function updateMiniInfo() {
+    if (state.playerCoords) {
+        document.getElementById('miniPos').textContent = state.playerCoords.x.toFixed(0) + ', ' + state.playerCoords.y.toFixed(0);
+    }
+    if (state.currentTarget) {
+        document.getElementById('miniTarget').textContent = state.currentTarget === 'factory' ? 'Factory' : 'Beginning';
+        const targetCoords = state.currentTarget === 'factory' ? state.factoryCoords : state.beginningCoords;
+        if (targetCoords && state.playerCoords) {
+            const dist = getDistance(state.playerCoords, targetCoords);
+            document.getElementById('miniDistance').textContent = dist.toFixed(0);
+        }
+    }
 }

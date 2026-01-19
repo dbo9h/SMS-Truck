@@ -1,16 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waypoint Toggle</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div id="main">
         <div class="container">
-            <h1>Waypoint Toggle</h1>
-            
+            <h1>Waypoint Toggle <button onclick="toggleMiniMode()" class="mini-toggle" title="Toggle Mini Mode">⇄</button></h1>            
+            <!-- Mini Mode Info (shown only in mini mode) -->
+            <div class="mini-info">
+                <div class="mini-info-item status-idle" id="miniStatus">
+                    <span class="label">Status:</span>
+                    <span class="value" id="miniStatusValue">Idle</span>
+                </div>
+                <div class="mini-info-item">
+                    <span class="label">Target:</span>
+                    <span class="value" id="miniTarget">None</span>
+                </div>
+                <div class="mini-info-item">
+                    <span class="label">Distance:</span>
+                    <span class="value" id="miniDistance">-</span>
+                </div>
+                <div class="mini-info-item">
+                    <span class="label">Pos:</span>
+                    <span class="value" id="miniPos">-</span>
+                </div>
+            </div>
+
+
             <div class="section">
                 <h2>Coordinates</h2>
                 <div class="coord-group">
@@ -18,14 +40,14 @@
                     <div class="coord-display" id="factoryDisplay">Not set</div>
                     <button onclick="captureFactory()" class="btn-capture">📍 Capture Factory</button>
                 </div>
-                
+
                 <div class="coord-group">
                     <label>Beginning Location:</label>
                     <div class="coord-display" id="beginningDisplay">Not set</div>
                     <button onclick="captureBeginning()" class="btn-capture">📍 Capture Beginning</button>
                 </div>
             </div>
-            
+
             <div class="section">
                 <h2>Automation</h2>
                 <button onclick="toggleAutomation()" id="automationBtn" class="btn-automation">
@@ -37,12 +59,32 @@
                     <div>Status: <span id="status">Idle</span></div>
                 </div>
             </div>
-            
+
+            <div class="section">
+                <h2>🛡️ OLED Protection</h2>
+                <div class="oled-controls">
+                    <label>
+                        Opacity:
+                        <input type="range" id="opacitySlider" min="20" max="100" value="90"
+                            oninput="updateOpacity(this.value)">
+                        <span id="opacityValue">90%</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="autoHide" onchange="toggleAutoHide(this.checked)">
+                        Auto-hide after 30s idle
+                    </label>
+                    <label>
+                        <input type="checkbox" id="positionShift" onchange="togglePositionShift(this.checked)">
+                        Shift position every 5min
+                    </label>
+                </div>
+            </div>
+
             <div class="section">
                 <h2>Current Position</h2>
                 <div class="coord-display" id="currentPos">Waiting for data...</div>
             </div>
-            
+
             <div class="section">
                 <h2>Activity Log</h2>
                 <div id="log" class="log"></div>
@@ -50,7 +92,8 @@
             </div>
         </div>
     </div>
-    
+
     <script src="index.js"></script>
 </body>
+
 </html>
