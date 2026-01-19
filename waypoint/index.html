@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waypoint Toggle</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="main">
+        <div class="container">
+            <h1>Waypoint Toggle</h1>
+            
+            <div class="section">
+                <h2>Coordinates</h2>
+                <div class="coord-group">
+                    <label>Factory Location:</label>
+                    <div class="coord-display" id="factoryDisplay">Not set</div>
+                    <button onclick="captureFactory()" class="btn-capture">📍 Capture Factory</button>
+                </div>
+                
+                <div class="coord-group">
+                    <label>Beginning Location:</label>
+                    <div class="coord-display" id="beginningDisplay">Not set</div>
+                    <button onclick="captureBeginning()" class="btn-capture">📍 Capture Beginning</button>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Automation</h2>
+                <button onclick="toggleAutomation()" id="automationBtn" class="btn-automation">
+                    ▶️ Start Automation
+                </button>
+                <div class="status">
+                    <div>Current Target: <span id="currentTarget">None</span></div>
+                    <div>Distance: <span id="distance">-</span></div>
+                    <div>Status: <span id="status">Idle</span></div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Current Position</h2>
+                <div class="coord-display" id="currentPos">Waiting for data...</div>
+            </div>
+            
+            <div class="section">
+                <h2>Activity Log</h2>
+                <div id="log" class="log"></div>
+                <button onclick="clearLog()" class="btn-clear">Clear Log</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="index.js"></script>
+</body>
+</html>
