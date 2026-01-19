@@ -132,7 +132,7 @@ function updateUI() {
     // Update current target
     if (state.currentTarget) {
         document.getElementById("currentTarget").textContent =
-            state.currentTarget === 'factory' ? 'Destination' : 'From';
+            state.currentTarget === 'factory' ? 'Destination' : 'From (Origin)';
     }
 
     // Update distance
@@ -489,7 +489,7 @@ function updateMiniInfo() {
         document.getElementById('miniPos').textContent = state.playerCoords.x.toFixed(0) + ', ' + state.playerCoords.y.toFixed(0);
     }
     if (state.currentTarget) {
-        document.getElementById('miniTarget').textContent = state.currentTarget === 'factory' ? 'Destination' : 'From';
+        document.getElementById('miniTarget').textContent = state.currentTarget === 'factory' ? 'Destination' : 'From (Origin)';
         const targetCoords = state.currentTarget === 'factory' ? state.factoryCoords : state.beginningCoords;
         if (targetCoords && state.playerCoords) {
             const dist = getDistance(state.playerCoords, targetCoords);
