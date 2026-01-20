@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Runs Calculator</title>
+	<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+	<div id="main">
+		<div class="user-input">
+			<div class="button-container">
+				<button class="toggle-settings" onclick="toggleSettings()">☰</button>
+			</div>
+			<div class="collapsible">
+				<!-- Trailer Settings Submenu -->
+				<div class="submenu">
+					<div class="submenu-header" onclick="toggleSubmenu(this)">
+						Trailer Settings <span class="submenu-toggle">▼</span>
+					</div>
+					<div class="submenu-content">
+						<label for="mk15">MK15:</label>
+						<input type="checkbox" id="mk15" value="mk15" />
+						<label for="trailer">Trailers:</label>
+						<select id="trailer">
+							<option value="">Select Trailer</option>
+							<option value="trailerswb">MK1</option>
+							<option value="trailerlogs2">MK3</option>
+							<option value="botdumptr">MK4</option>
+							<option value="drybulktr">MK5</option>
+							<option value="dumptr">MK6</option>
+							<option value="docktrailer2">MK7</option>
+							<option value="docktrailer">MK8</option>
+							<option value="trailers2">MK9</option>
+							<option value="trailerswb2">MK10</option>
+							<option value="tvtrailer">MK11</option>
+							<option value="tvtrailer2">MK12</option>
+							<option value="boxlongtr">MK13</option>
+							<option value="trailerlarge">MK14</option>
+						</select>
+						<label for="postop">Post OP Perk:</label>
+						<input type="checkbox" id="postop" />
+						<label for="premium">Premium:</label>
+						<input type="checkbox" id="premium" />
+					</div>
+				</div>
+
+				<!-- Item Transfer Submenu -->
+				<div class="submenu">
+					<div class="submenu-header" onclick="toggleSubmenu(this)">
+						Item Transfer <span class="submenu-toggle">▼</span>
+					</div>
+					<div class="submenu-content">
+						<label for="itemType">Item Type:</label>
+						<select id="itemType"></select>
+						<label for="currentItems">Current Items:</label>
+						<input type="number" id="currentItems" placeholder="Enter current item count" min="0" value="0" />
+						<label for="moveAll">Move All Items:</label>
+						<input type="checkbox" id="moveAll" checked />
+						<label for="moveAmount">Move Specific Amount:</label>
+						<input type="number" id="moveAmount" placeholder="Enter amount to move" min="0" value="0" disabled />
+					</div>
+				</div>
+
+				<!-- Results Submenu -->
+				<div class="submenu">
+					<div class="submenu-header" onclick="toggleSubmenu(this)">
+						Results <span class="submenu-toggle">▼</span>
+					</div>
+					<div class="submenu-content">
+						<div style="grid-column: span 2;">Total Items: <span id="total-items">0</span></div>
+						<div style="grid-column: span 2;">Item Weight: <span id="item-weight">0</span> kg per item</div>
+						<div style="grid-column: span 2;">Total Weight: <span id="total-weight">0</span> kg</div>
+						<div style="grid-column: span 2;">Trailer Capacity: <span id="trailer-capacity">0</span> kg</div>
+						<div style="grid-column: span 2;">Items to Move: <span id="items-to-move">0</span></div>
+						<div style="grid-column: span 2;">Weight to Move: <span id="weight-to-move">0</span> kg</div>
+						<div style="grid-column: span 2;">Runs Required: <span id="runs-required">0</span></div>
+					</div>
+				</div>
+			</div>
+			<div id="error" class="error"></div>
+		</div>
+	</div>
+	<script src="index.js"></script>
+</body>
+</html>
