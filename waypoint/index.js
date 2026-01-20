@@ -34,6 +34,8 @@ document.addEventListener("DOMContentLoaded", () => {
     loadSettings();
     loadOLEDSettings();
     loadMiniMode();
+    loadUIPosition();
+    loadManualHideState();
     setupDragListeners();
     log("Waypoint Toggle app loaded", "info");
 
@@ -81,6 +83,8 @@ function dragEnd(e) {
     initialX = currentX;
     initialY = currentY;
     isDragging = false;
+    // Save position to localStorage (like dogg does)
+    saveUIPosition();
 }
 
 function setTranslate(xPos, yPos, el) {
@@ -451,6 +455,7 @@ function shiftPosition() {
     yOffset += shiftY;
 
     setTranslate(xOffset, yOffset, document.querySelector(".container"));
+    saveUIPosition(); // Save position after shift (like dogg does)
     log(`Position shifted (${shiftX}, ${shiftY}) for OLED protection`, "info");
 }
 
@@ -474,6 +479,52 @@ function loadOLEDSettings() {
 document.addEventListener("mousemove", resetActivityTimer);
 document.addEventListener("mousedown", resetActivityTimer);
 document.addEventListener("keypress", resetActivityTimer);
+
+// Save UI position to localStorage (like dogg's windowPosition)
+function saveUIPosition() {
+    localStorage.setItem("uiPosition", JSON.stringify({
+        x: xOffset,
+        y: yOffset
+    }));
+}
+
+// Load UI position from localStorage
+function loadUIPosition() {
+    try {
+        const saved = localStorage.getItem("uiPosition");
+        if (saved) {
+            const pos = JSON.parse(saved);
+            if (pos.x !== undefined && pos.y !== undefined) {
+                xOffset = pos.x;
+                yOffset = pos.y;
+                const container = document.querySelector(".container");
+                if (container) {
+                    setTranslate(xOffset, yOffset, container);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Failed to load UI position:", e);
+    }
+}
+
+// Save manual hide state to localStorage (like dogg's boolean states)
+function saveManualHideState() {
+    localStorage.setItem("uiManuallyHidden", uiManuallyHidden ? "true" : "false");
+}
+
+// Load manual hide state from localStorage
+function loadManualHideState() {
+    const saved = localStorage.getItem("uiManuallyHidden");
+    if (saved === "true") {
+        uiManuallyHidden = true;
+        const container = document.querySelector(".container");
+        if (container) {
+            hideUI();
+            stopAutoHideTimer();
+        }
+    }
+}
 
 // Keyboard shortcut: F2 to toggle UI visibility
 window.addEventListener("keydown", (e) => {
@@ -499,6 +550,8 @@ window.addEventListener("keydown", (e) => {
         // While manually hidden, never auto-show
         stopAutoHideTimer();
     }
+    // Save state to localStorage (like dogg does)
+    saveManualHideState();
 });
 
 
