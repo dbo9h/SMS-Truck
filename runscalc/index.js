@@ -96,6 +96,8 @@ let dragStartX = 0;
 let dragStartY = 0;
 let initialX = 0;
 let initialY = 0;
+let storages = [];
+const API_URL = "https://api.rp3.com";
 
 function toggleSettings() {
 	const userInput = document.getElementById("main").querySelector(".user-input");
@@ -210,6 +212,32 @@ function calculateCapacity() {
 	return capacity;
 }
 
+function updateItemCountFromStorage() {
+	const sourceStorageId = document.getElementById("sourceStorage").value;
+	const itemType = document.getElementById("itemType").value;
+	
+	if (!sourceStorageId || !itemType) {
+		document.getElementById("currentItems").value = 0;
+		calculateRuns();
+		return;
+	}
+	
+	// Find the storage
+	const storage = storages.find(s => s.storage.id === sourceStorageId);
+	if (!storage) {
+		document.getElementById("currentItems").value = 0;
+		calculateRuns();
+		return;
+	}
+	
+	// Find the item in storage
+	const item = storage.items.find(i => i.item && i.item.id === itemType);
+	const count = item ? item.amount : 0;
+	
+	document.getElementById("currentItems").value = count;
+	calculateRuns();
+}
+
 function calculateRuns() {
 	const itemType = document.getElementById("itemType").value;
 	const currentItems = parseInt(document.getElementById("currentItems").value) || 0;
@@ -270,6 +298,125 @@ function populateItemDropdown() {
 	});
 }
 
+function populateStorageDropdowns() {
+	const sourceSelect = document.getElementById("sourceStorage");
+	const destSelect = document.getElementById("destinationStorage");
+	
+	// Clear existing options except first
+	sourceSelect.innerHTML = '<option value="">Select Source Storage</option>';
+	destSelect.innerHTML = '<option value="">Select Destination Storage</option>';
+	
+	// Add storages
+	storages.forEach(storage => {
+		const sourceOption = document.createElement("option");
+		sourceOption.value = storage.storage.id;
+		sourceOption.textContent = storage.storage.name;
+		sourceSelect.appendChild(sourceOption);
+		
+		const destOption = document.createElement("option");
+		destOption.value = storage.storage.id;
+		destOption.textContent = storage.storage.name;
+		destSelect.appendChild(destOption);
+	});
+}
+
+async function fetchStorages() {
+	const apiKey = localStorage.getItem("apiKey");
+	const userId = localStorage.getItem("userId");
+	
+	if (!apiKey || !userId) {
+		showError("Please enter API Key and User ID");
+		return;
+	}
+	
+	try {
+		const response = await fetch(`${API_URL}/storages/${userId}`, {
+			headers: {
+				"Authorization": `Bearer ${apiKey}`
+			}
+		});
+		
+		if (!response.ok) {
+			throw new Error(`API Error: ${response.status}`);
+		}
+		
+		const data = await response.json();
+		storages = parseStorages(data.storages || {});
+		populateStorageDropdowns();
+		updateItemCountFromStorage();
+		showError("");
+	} catch (error) {
+		console.error("Failed to fetch storages:", error);
+		showError(`Failed to fetch storages: ${error.message}`);
+	}
+}
+
+function parseStorages(storageData) {
+	const userId = localStorage.getItem("userId");
+	const factionId = localStorage.getItem("factionId");
+	
+	return Object.entries(storageData).map(([id, items]) => {
+		const storage = getStorageById(id, userId, factionId);
+		if (!storage) return null;
+		
+		const parsedItems = Object.entries(items).map(([itemId, itemData]) => {
+			const amount = typeof itemData === 'object' ? itemData.amount : itemData;
+			const item = ITEM_WEIGHTS[itemId];
+			if (!item) return null;
+			return { item: { id: itemId, name: item.name, weight: item.weight }, amount: amount };
+		}).filter(i => i !== null);
+		
+		return {
+			storage: storage,
+			items: parsedItems
+		};
+	}).filter(s => s !== null);
+}
+
+function getStorageById(id, userId, factionId) {
+	// Common storage IDs from Dogg
+	const storageMap = {
+		"biz_train": { name: "Trainyard Storage", id: "biz_train", type: "storage" },
+		"faction": { name: "Faction Storage", id: "faction", type: "storage" },
+		"biz_hookies": { name: "Hookies", id: "biz_hookies", type: "storage" },
+		"biz_granny": { name: "Grandma's House", id: "biz_granny", type: "storage" },
+		"biz_yellowjack": { name: "Yellowjack", id: "biz_yellowjack", type: "storage" },
+		"bctp": { name: "Blaine County Tractor Parts", id: "bctp", type: "storage" },
+		"pbsf": { name: "Paleto Bay Self Storage", id: "pbsf", type: "storage" },
+		"bhsl": { name: "Big House Storage LSIA", id: "bhsl", type: "storage" },
+		"tsu": { name: "The Secure Unit", id: "tsu", type: "storage" },
+		"dpss": { name: "Del Perro Self Storage", id: "dpss", type: "storage" },
+		"gohq": { name: "Palmer-Taylor Power Station", id: "gohq", type: "storage" },
+		"fthq": { name: "Pillbox Hill Storage Unit", id: "fthq", type: "storage" },
+		"bats": { name: "Rogers Salvage & Scrap", id: "bats", type: "storage" }
+	};
+	
+	return storageMap[id] || { name: id, id: id, type: "storage" };
+}
+
+function saveApiKey() {
+	const apiKey = document.getElementById("apiKey").value;
+	const userId = document.getElementById("userId").value;
+	
+	if (!apiKey || !userId) {
+		showError("Please enter both API Key and User ID");
+		return;
+	}
+	
+	localStorage.setItem("apiKey", apiKey);
+	localStorage.setItem("userId", userId);
+	showError("API Key saved!");
+	setTimeout(() => showError(""), 2000);
+}
+
+async function refresh() {
+	await fetchStorages();
+}
+
+function showError(message) {
+	document.getElementById("error").textContent = message;
+}
+
 function setupEventListeners() {
 	// Toggle move all / specific amount
 	document.getElementById("moveAll").addEventListener("change", function() {
@@ -300,15 +447,30 @@ function setupEventListeners() {
 	
 	document.getElementById("postop").addEventListener("change", calculateRuns);
 	document.getElementById("premium").addEventListener("change", calculateRuns);
-	document.getElementById("itemType").addEventListener("change", calculateRuns);
+	document.getElementById("itemType").addEventListener("change", updateItemCountFromStorage);
+	document.getElementById("sourceStorage").addEventListener("change", updateItemCountFromStorage);
 	document.getElementById("currentItems").addEventListener("input", calculateRuns);
 	document.getElementById("moveAmount").addEventListener("input", calculateRuns);
 }
 
 // Initialize
 document.addEventListener("DOMContentLoaded", function() {
+	// Load saved API key and user ID
+	const savedApiKey = localStorage.getItem("apiKey");
+	const savedUserId = localStorage.getItem("userId");
+	if (savedApiKey) document.getElementById("apiKey").value = savedApiKey;
+	if (savedUserId) document.getElementById("userId").value = savedUserId;
+	
 	populateItemDropdown();
 	setupEventListeners();
 	initDragging();
+	
+	// Load storages if API key exists
+	if (savedApiKey && savedUserId) {
+		fetchStorages();
+	} else {
+		populateStorageDropdowns();
+	}
+	
 	calculateRuns();
 });

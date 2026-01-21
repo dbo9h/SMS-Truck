@@ -13,6 +13,23 @@
 				<button class="toggle-settings" onclick="toggleSettings()">☰</button>
 			</div>
 			<div class="collapsible">
+				<!-- User Settings Submenu -->
+				<div class="submenu">
+					<div class="submenu-header" onclick="toggleSubmenu(this)">
+						User Settings <span class="submenu-toggle">▼</span>
+					</div>
+					<div class="submenu-content">
+						<label for="apiKey">API Key:</label>
+						<input type="password" id="apiKey" placeholder="Enter API Key" />
+						<label for="userId">User ID:</label>
+						<input type="number" id="userId" placeholder="Enter User ID" />
+						<div style="grid-column: span 2; display: flex; justify-content: space-around; margin-top: 5px;">
+							<button onclick="saveApiKey()">Save API Key</button>
+							<button onclick="refresh()" title="Uses 3 API charges per refresh">Refresh</button>
+						</div>
+					</div>
+				</div>
+
 				<!-- Trailer Settings Submenu -->
 				<div class="submenu">
 					<div class="submenu-header" onclick="toggleSubmenu(this)">
@@ -45,6 +62,23 @@
 					</div>
 				</div>
 
+				<!-- Storage Selection Submenu -->
+				<div class="submenu">
+					<div class="submenu-header" onclick="toggleSubmenu(this)">
+						Storage Selection <span class="submenu-toggle">▼</span>
+					</div>
+					<div class="submenu-content">
+						<label for="sourceStorage">Source Storage:</label>
+						<select id="sourceStorage">
+							<option value="">Select Source Storage</option>
+						</select>
+						<label for="destinationStorage">Destination Storage:</label>
+						<select id="destinationStorage">
+							<option value="">Select Destination Storage</option>
+						</select>
+					</div>
+				</div>
+
 				<!-- Item Transfer Submenu -->
 				<div class="submenu">
 					<div class="submenu-header" onclick="toggleSubmenu(this)">
@@ -54,7 +88,7 @@
 						<label for="itemType">Item Type:</label>
 						<select id="itemType"></select>
 						<label for="currentItems">Current Items:</label>
-						<input type="number" id="currentItems" placeholder="Enter current item count" min="0" value="0" />
+						<input type="number" id="currentItems" placeholder="Auto-filled from storage" min="0" value="0" readonly />
 						<label for="moveAll">Move All Items:</label>
 						<input type="checkbox" id="moveAll" checked />
 						<label for="moveAmount">Move Specific Amount:</label>
