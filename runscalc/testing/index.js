@@ -554,22 +554,12 @@ function renderSelectedItems() {
 
 	itemsList.innerHTML = "";
 
-	// Track items to remove (when storage is empty)
-	const itemsToRemove = [];
-
 	selectedItems.forEach((item, index) => {
 		const itemData = ITEM_WEIGHTS[item.itemId];
 		if (!itemData) return;
 
 		const currentInStorage = getRemainingInStorage(item.itemId);
 		const originalAmount = item.originalAmount || item.amount;
-
-		// Auto-remove if storage is empty (all items moved)
-		if (currentInStorage !== null && currentInStorage === 0) {
-			itemsToRemove.push(index);
-			console.log(`🗑️ Auto-removing ${itemData.name} (storage empty)`);
-			return; // Skip rendering this item
-		}
 
 		// Calculate how many were moved (original - current)
 		const movedAmount = currentInStorage !== null ? (originalAmount - currentInStorage) : 0;
@@ -604,18 +594,6 @@ function renderSelectedItems() {
 
 		itemsList.appendChild(entry);
 	});
-
-	// Remove items with empty storage (in reverse order to maintain indices)
-	for (let i = itemsToRemove.length - 1; i >= 0; i--) {
-		selectedItems.splice(itemsToRemove[i], 1);
-	}
-
-	// If items were removed, save and re-render
-	if (itemsToRemove.length > 0) {
-		saveSelectedItems();
-		renderSelectedItems(); // Re-render without removed items
-		return;
-	}
 
 	saveSelectedItems();
 	// Force immediate recalculation
