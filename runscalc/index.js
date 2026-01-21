@@ -535,6 +535,13 @@ function calculateRuns() {
 
 			const weight = amountToCalculate * itemData.weight;
 			const runs = Math.ceil(weight / capacity);
+
+			// Skip items with 0 runs (already completed)
+			if (runs === 0) {
+				console.log(`  - ${itemData.name}: completed (${item.amount} target reached)`);
+				return;
+			}
+
 			totalRuns += runs;
 			totalWeight += weight;
 
