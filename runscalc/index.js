@@ -103,6 +103,69 @@ const ALTERNATIVE_API_URL = "https://d.ttstats.eu/public-main/status/";
 let apiUrl = DEFAULT_API_URL;
 let autoRefreshTimer = null;
 
+// In-app console logging
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+function addToConsole(message, type = 'log') {
+	const consoleOutput = document.getElementById('console-output');
+	if (!consoleOutput) return;
+
+	const logEntry = document.createElement('div');
+	logEntry.className = `console-log ${type}`;
+
+	// Format the message - handle arrays of arguments
+	let formattedMessage = '';
+	if (Array.isArray(message)) {
+		formattedMessage = message.map(arg => {
+			if (typeof arg === 'object' && arg !== null) {
+				try {
+					return JSON.stringify(arg, null, 2);
+				} catch (e) {
+					return String(arg);
+				}
+			}
+			return String(arg);
+		}).join(' ');
+	} else if (typeof message === 'object' && message !== null) {
+		try {
+			formattedMessage = JSON.stringify(message, null, 2);
+		} catch (e) {
+			formattedMessage = String(message);
+		}
+	} else {
+		formattedMessage = String(message);
+	}
+
+	const timestamp = new Date().toLocaleTimeString();
+	logEntry.textContent = `[${timestamp}] ${formattedMessage}`;
+
+	consoleOutput.appendChild(logEntry);
+	consoleOutput.scrollTop = consoleOutput.scrollHeight;
+
+	// Keep only last 100 entries
+	while (consoleOutput.children.length > 100) {
+		consoleOutput.removeChild(consoleOutput.firstChild);
+	}
+}
+
+// Override console methods
+console.log = function (...args) {
+	originalConsoleLog.apply(console, args);
+	addToConsole(args, 'info');
+};
+
+console.error = function (...args) {
+	originalConsoleError.apply(console, args);
+	addToConsole(args, 'error');
+};
+
+console.warn = function (...args) {
+	originalConsoleWarn.apply(console, args);
+	addToConsole(args, 'warn');
+};
+
 // Real-time storage update handler
 function updateStorageFromMessage(messageData) {
 	console.log("📨 Received storage update message:", messageData);
@@ -408,6 +471,8 @@ function renderSelectedItems() {
 		// Calculate how many were moved (original - current)
 		const movedAmount = currentInStorage !== null ? (originalAmount - currentInStorage) : 0;
 
+		console.log(`📊 ${itemData.name}: original=${originalAmount}, current=${currentInStorage}, moved=${movedAmount}`);
+
 		const storageText = currentInStorage !== null
 			? ` <span style="color: #888; font-size: 0.85em;">(${currentInStorage.toLocaleString()} in storage, ${movedAmount > 0 ? movedAmount.toLocaleString() + ' moved' : 'none moved'})</span>`
 			: '';
@@ -677,6 +742,61 @@ async function fetchStorages() {
 	} catch (error) {
 		console.error("Failed to fetch storages:", error);
 		showError(`Failed to fetch storages: ${error.message}`);
+	}
+}
+
+// Update storage from FiveM chest data (NO API CALLS!)
+function updateStorageFromChest(chestId, chestData) {
+	console.log(`📦 Processing chest data for: ${chestId}`, chestData);
+
+	const userId = localStorage.getItem("userId");
+	if (!userId) return;
+
+	if (!chestData || typeof chestData !== "object") {
+		console.warn("Invalid chest data");
+		return;
+	}
+
+	// Chest data is inventory format: {itemName: amount, ...}
+	// We need to update our storages with this data
+	let updated = false;
+
+	storages.forEach(storage => {
+		if (storage && storage.items) {
+			storage.items.forEach(storageItem => {
+				if (!storageItem.item) return;
+
+				// Try to find matching item in chest data by name
+				const itemName = storageItem.item.name;
+				const itemId = storageItem.item.id;
+
+				// Check both name and id
+				if (chestData[itemName] !== undefined) {
+					const newAmount = parseInt(chestData[itemName]) || 0;
+					if (storageItem.amount !== newAmount) {
+						console.log(`  ✓ ${itemName}: ${storageItem.amount} → ${newAmount}`);
+						storageItem.amount = newAmount;
+						updated = true;
+					}
+				} else if (chestData[itemId] !== undefined) {
+					const newAmount = parseInt(chestData[itemId]) || 0;
+					if (storageItem.amount !== newAmount) {
+						console.log(`  ✓ ${itemName}: ${storageItem.amount} → ${newAmount}`);
+						storageItem.amount = newAmount;
+						updated = true;
+					}
+				}
+			});
+		}
+	});
+
+	if (updated) {
+		// Refresh UI with updated data
+		renderSelectedItems();
+		calculateRuns();
+		console.log("✅ Storage updated from FiveM (no API charge!)");
+	} else {
+		console.log("⚠️ No matching items found in chest data");
 	}
 }
 
@@ -1051,41 +1171,129 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Listen for real-time storage updates from FiveM game client
 	window.addEventListener("message", function (event) {
-		// Log all messages for debugging
-		console.log("📬 Message received:", event.data);
+		if (!event.data) return;
 
-		// Handle storage updates
-		if (event.data) {
-			// Try to parse the message data
-			try {
-				let messageData = event.data;
+		try {
+			let data = event.data;
 
-				// If it's a string, try to parse it as JSON
-				if (typeof messageData === "string") {
-					try {
-						messageData = JSON.parse(messageData);
-					} catch (e) {
-						// Not JSON, ignore
-						return;
-					}
+			// Parse JSON if string
+			if (typeof data === "string") {
+				try {
+					data = JSON.parse(data);
+				} catch (e) {
+					return;
 				}
-
-				// Check if this is a storage-related message
-				if (messageData.storages ||
-					messageData.storage ||
-					(messageData.type && messageData.type.includes("storage"))) {
-					updateStorageFromMessage(messageData);
-				}
-			} catch (error) {
-				console.error("❌ Error processing message:", error);
 			}
+
+			// Handle FiveM chest data (chest_[id] contains storage inventory)
+			// Check for any keys starting with "chest_"
+			for (const key in data) {
+				if (key.startsWith("chest_")) {
+					console.log(`📦 Chest data received: ${key}`);
+					console.log(JSON.stringify(data[key], null, 2));
+					const chestData = typeof data[key] === "string" ? JSON.parse(data[key]) : data[key];
+					updateStorageFromChest(key, chestData);
+					return;
+				}
+			}
+
+			// Handle inventory data (player's current inventory)
+			if (data.inventory) {
+				console.log(`🎒 Inventory data received`);
+				const inventoryData = typeof data.inventory === "string" ? JSON.parse(data.inventory) : data.inventory;
+				updateStorageFromChest("player_inventory", inventoryData);
+				return;
+			}
+
+			// Fallback: Handle old format storage messages
+			if (data.storages || data.storage || (data.type && data.type.includes("storage"))) {
+				console.log(`📨 Storage message received`);
+				updateStorageFromMessage(data);
+			}
+		} catch (error) {
+			console.error("❌ Error processing message:", error);
 		}
 	});
 
-	// Start auto-refresh if enabled
-	if (document.getElementById("autoRefresh").checked) {
-		startAutoRefresh();
+	// Automatic refresh functionality
+	let autoRefreshInterval = null;
+
+	function startAutoRefresh() {
+		if (autoRefreshInterval) return; // Already running
+
+		console.log("🔄 Auto-refresh enabled - polling API every 30 seconds");
+
+		// Refresh immediately
+		silentRefreshStorages();
+
+		// Then refresh every 30 seconds
+		autoRefreshInterval = setInterval(() => {
+			silentRefreshStorages();
+		}, 30000); // 30 seconds
 	}
 
-	console.log("✓ Runs Calculator initialized with real-time updates enabled");
+	function stopAutoRefresh() {
+		if (autoRefreshInterval) {
+			clearInterval(autoRefreshInterval);
+			autoRefreshInterval = null;
+			console.log("⏸️ Auto-refresh disabled");
+		}
+	}
+
+	// Auto-refresh toggle handler
+	const autoRefreshCheckbox = document.getElementById('autoRefresh');
+	if (autoRefreshCheckbox) {
+		autoRefreshCheckbox.addEventListener('change', function () {
+			if (this.checked) {
+				startAutoRefresh();
+			} else {
+				stopAutoRefresh();
+			}
+		});
+
+		// Start if checked by default
+		if (autoRefreshCheckbox.checked) {
+			startAutoRefresh();
+		}
+	}
+
+	console.log("✓ Runs Calculator initialized");
+	console.log("ℹ️ Storage data comes from API - click 'Fetch Storages' to update");
+
+	// Console toggle
+	const showConsoleCheckbox = document.getElementById('showConsole');
+	const debugConsole = document.getElementById('debug-console');
+	if (showConsoleCheckbox && debugConsole) {
+		showConsoleCheckbox.addEventListener('change', function () {
+			debugConsole.style.display = this.checked ? 'block' : 'none';
+		});
+
+		// Make console draggable
+		const consoleHeader = debugConsole.querySelector('.console-header');
+		let isDragging = false;
+		let currentX, currentY, initialX, initialY;
+
+		consoleHeader.addEventListener('mousedown', function (e) {
+			isDragging = true;
+			initialX = e.clientX - debugConsole.offsetLeft;
+			initialY = e.clientY - debugConsole.offsetTop;
+		});
+
+		document.addEventListener('mousemove', function (e) {
+			if (isDragging) {
+				e.preventDefault();
+				currentX = e.clientX - initialX;
+				currentY = e.clientY - initialY;
+				debugConsole.style.left = currentX + 'px';
+				debugConsole.style.top = currentY + 'px';
+				debugConsole.style.bottom = 'auto';
+			}
+		});
+
+		document.addEventListener('mouseup', function () {
+			isDragging = false;
+		});
+	}
+
+	console.log("✓ Runs Calculator initialized - listening for FiveM storage updates");
 });
