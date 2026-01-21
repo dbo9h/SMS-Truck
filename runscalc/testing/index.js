@@ -103,51 +103,50 @@ const ALTERNATIVE_API_URL = "https://d.ttstats.eu/public-main/status/";
 let apiUrl = DEFAULT_API_URL;
 let autoRefreshTimer = null;
 
-// Runtime cache system (like dogg)
+// Runtime cache system (like Dogg)
 let runningInGame = false; // Detected when we get fromTycoonScript message
-let runtimeCache = {}; // Mutable runtime storage data
+let runtimeCache = {}; // Mutable runtime storage data (chest_*, inventory, backpack)
 let storagesUpdatedSinceLastRefresh = false;
 let pendingRefresh = false;
 let refreshTimeout = null;
 const REFRESH_IMMEDIATE_DELAY = 100; // ms - debounce delay for updates
 
-// Listen for FiveM messages with fromTycoonScript flag
-window.addEventListener("message", function (event) {
-	const data = event.data;
+// Listen for FiveM messages (same pattern as Dogg: event.data = { fromTycoonScript, data: {...} })
+window.addEventListener("message", ({ data }) => {
+	if (!data || typeof data !== "object" || data.fromTycoonScript !== true) return;
 
-	// Check if message is from FiveM game (has fromTycoonScript flag)
-	if (data && data.fromTycoonScript === true) {
-		// Mark that we're running in game
-		if (!runningInGame) {
-			runningInGame = true;
-			console.log("🎮 Running in FiveM - runtime updates enabled");
-		}
+	// Mark that we're running inside FiveM
+	if (!runningInGame) {
+		runningInGame = true;
+		console.log("🎮 Running in FiveM - runtime updates enabled (0 API charges)");
+	}
 
-		// Update runtime cache with any storage data
-		for (const key in data) {
-			if (key.startsWith("chest_") || key === "inventory") {
-				try {
-					let inventoryData = data[key];
-					if (typeof inventoryData === 'string') {
-						inventoryData = JSON.parse(inventoryData);
-					}
+	// Dogg stores payload in e.data; mirror that here
+	const payload = data.data && typeof data.data === "object" ? data.data : data;
+	if (!payload || typeof payload !== "object") return;
 
-					if (inventoryData && typeof inventoryData === 'object') {
-						runtimeCache[key] = inventoryData;
-						storagesUpdatedSinceLastRefresh = true;
-
-						// Schedule debounced refresh
-						scheduleRuntimeRefresh();
-					}
-				} catch (e) {
-					// Ignore parse errors
+	// Update runtime cache with storage-related keys (chest_*, inventory, backpack)
+	for (const [key, value] of Object.entries(payload)) {
+		if ((key.startsWith("chest_") && key !== "chest") || key === "inventory" || key === "backpack") {
+			try {
+				let inventoryData = value;
+				if (typeof inventoryData === "string") {
+					inventoryData = inventoryData === "" ? {} : JSON.parse(inventoryData);
 				}
+
+				if (inventoryData && typeof inventoryData === "object") {
+					runtimeCache[key] = inventoryData;
+					storagesUpdatedSinceLastRefresh = true;
+					scheduleRuntimeRefresh();
+				}
+			} catch {
+				// Ignore malformed payloads
 			}
 		}
 	}
 });
 
-// Debounced refresh function
+// Debounced refresh of storages from runtime cache (no API)
 function scheduleRuntimeRefresh() {
 	if (pendingRefresh) return;
 
@@ -164,46 +163,46 @@ function scheduleRuntimeRefresh() {
 	}, REFRESH_IMMEDIATE_DELAY);
 }
 
-// Apply runtime cache to storage items
+// Apply runtime cache to current storages and recalc UI
 function applyRuntimeCacheToStorages() {
 	if (!runningInGame || Object.keys(runtimeCache).length === 0) return;
 
 	let updated = false;
 
 	storages.forEach(storage => {
-		if (storage && storage.items) {
-			storage.items.forEach(storageItem => {
-				if (storageItem.item) {
-					const itemName = storageItem.item.name;
-					const itemId = storageItem.item.id;
+		if (!storage || !storage.items) return;
 
-					// Check all cached chests for this item
-					for (const chestKey in runtimeCache) {
-						const chestData = runtimeCache[chestKey];
+		storage.items.forEach(storageItem => {
+			if (!storageItem.item) return;
 
-						if (chestData[itemName] !== undefined) {
-							const newAmount = parseInt(chestData[itemName]) || 0;
-							if (storageItem.amount !== newAmount) {
-								storageItem.amount = newAmount;
-								updated = true;
-							}
-						} else if (chestData[itemId] !== undefined) {
-							const newAmount = parseInt(chestData[itemId]) || 0;
-							if (storageItem.amount !== newAmount) {
-								storageItem.amount = newAmount;
-								updated = true;
-							}
-						}
+			const itemName = storageItem.item.name;
+			const itemId = storageItem.item.id;
+
+			for (const chestKey in runtimeCache) {
+				const chestData = runtimeCache[chestKey];
+				if (!chestData || typeof chestData !== "object") continue;
+
+				if (chestData[itemName] !== undefined) {
+					const newAmount = parseInt(chestData[itemName]) || 0;
+					if (storageItem.amount !== newAmount) {
+						storageItem.amount = newAmount;
+						updated = true;
+					}
+				} else if (chestData[itemId] !== undefined) {
+					const newAmount = parseInt(chestData[itemId]) || 0;
+					if (storageItem.amount !== newAmount) {
+						storageItem.amount = newAmount;
+						updated = true;
 					}
 				}
-			});
-		}
+			}
+		});
 	});
 
 	if (updated) {
 		renderSelectedItems();
 		calculateRuns();
-		console.log("✅ Runtime update applied (0 API charges)");
+		console.log("✅ Runtime storage update applied (0 API charges)");
 	}
 }
 
@@ -1284,7 +1283,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Load settings after everything is set up
 	loadSettings();
-
+	
 	// Panel opacity listener
 	document.getElementById("panelOpacity").addEventListener("input", function () {
 		const userInput = document.getElementById("main").querySelector(".user-input");
@@ -1292,7 +1291,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		userInput.style.opacity = opacity;
 		localStorage.setItem("panelOpacity", opacity.toString());
 	});
-
+	
 	// Load storages if API key exists
 	if (savedApiKey && savedUserId) {
 		fetchStorages().then(() => {
@@ -1309,143 +1308,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		loadSettings();
 		calculateRuns();
 	}
-
-	// Listen for ALL FiveM messages and update storage data in real-time
-	window.addEventListener("message", function (event) {
-		if (!event.data || typeof event.data !== 'object') return;
-
-		const data = event.data;
-		let storageUpdated = false;
-
-		// FiveM sends data as flat key-value pairs
-		// Look for chest_ keys which contain storage inventory
-		for (const key in data) {
-			if (key.startsWith("chest_")) {
-				try {
-					// Parse the chest data
-					let chestInventory = data[key];
-					if (typeof chestInventory === 'string') {
-						chestInventory = JSON.parse(chestInventory);
-					}
-
-					// Update our storage data with this chest's inventory
-					if (chestInventory && typeof chestInventory === 'object') {
-						// Find matching storage and update item amounts
-						storages.forEach(storage => {
-							if (storage && storage.items) {
-								storage.items.forEach(storageItem => {
-									if (storageItem.item) {
-										const itemName = storageItem.item.name;
-										const itemId = storageItem.item.id;
-
-										// Check if this item is in the chest data
-										if (chestInventory[itemName] !== undefined) {
-											const newAmount = parseInt(chestInventory[itemName]) || 0;
-											if (storageItem.amount !== newAmount) {
-												storageItem.amount = newAmount;
-												storageUpdated = true;
-											}
-										} else if (chestInventory[itemId] !== undefined) {
-											const newAmount = parseInt(chestInventory[itemId]) || 0;
-											if (storageItem.amount !== newAmount) {
-												storageItem.amount = newAmount;
-												storageUpdated = true;
-											}
-										}
-									}
-								});
-							}
-						});
-					}
-				} catch (e) {
-					// Ignore parse errors
-				}
-			}
-		}
-
-		// If storage was updated, refresh the UI
-		if (storageUpdated) {
-			renderSelectedItems();
-			calculateRuns();
-			console.log("✅ Storage updated from FiveM (no API charge)");
-		}
-	});
-
+	
 	console.log("✓ Runs Calculator initialized");
-	console.log("ℹ️ Requesting runtime data from FiveM (0 API charges)");
-
-	// Request data from FiveM to start receiving runtime updates
-	try {
-		window.postMessage({ type: "getData" }, "*");
-		console.log("📡 Sent getData request to FiveM");
-	} catch (e) {
-		console.log("Not running in FiveM - use manual 'Fetch Storages' button");
-	}
-
-	// Automatic refresh functionality
-	let autoRefreshInterval = null;
-
-	function getRefreshInterval() {
-		const intervalSelect = document.getElementById('refreshInterval');
-		return intervalSelect ? parseInt(intervalSelect.value) : 30000;
-	}
-
-	function startAutoRefresh() {
-		if (autoRefreshInterval) {
-			clearInterval(autoRefreshInterval);
-		}
-
-		const interval = getRefreshInterval();
-		console.log(`🔄 Auto-refresh enabled - polling API every ${interval / 1000} seconds`);
-
-		// Refresh immediately
-		silentRefreshStorages();
-
-		// Then refresh at selected interval
-		autoRefreshInterval = setInterval(() => {
-			silentRefreshStorages();
-		}, interval);
-	}
-
-	function stopAutoRefresh() {
-		if (autoRefreshInterval) {
-			clearInterval(autoRefreshInterval);
-			autoRefreshInterval = null;
-			console.log("⏸️ Auto-refresh disabled");
-		}
-	}
-
-	// Auto-refresh toggle handler
-	const autoRefreshCheckbox = document.getElementById('autoRefresh');
-	const refreshIntervalSelect = document.getElementById('refreshInterval');
-
-	if (autoRefreshCheckbox) {
-		autoRefreshCheckbox.addEventListener('change', function () {
-			if (this.checked) {
-				startAutoRefresh();
-			} else {
-				stopAutoRefresh();
-			}
-		});
-
-		// Start if checked by default
-		if (autoRefreshCheckbox.checked) {
-			startAutoRefresh();
-		}
-	}
-
-	// Restart auto-refresh when interval changes
-	if (refreshIntervalSelect) {
-		refreshIntervalSelect.addEventListener('change', function () {
-			if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
-				startAutoRefresh(); // Restart with new interval
-			}
-		});
-	}
-
-	console.log("✓ Runs Calculator initialized");
-	console.log("ℹ️ Storage data comes from API - click 'Fetch Storages' to update");
-
+	console.log("ℹ️ Storage data comes from API - click 'Fetch Storages' to update (runtime updates from FiveM use 0 charges)");
+	
 	// Console toggle
 	const showConsoleCheckbox = document.getElementById('showConsole');
 	const debugConsole = document.getElementById('debug-console');
