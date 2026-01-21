@@ -837,49 +837,16 @@ function updateStorageFromChest(chestId, chestData) {
 	}
 }
 
-// Silent refresh for auto-polling (doesn't show errors)
+// Silent refresh for auto-polling (ALWAYS fetches fresh data)
 async function silentRefreshStorages() {
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
 
 	if (!apiKey || !userId) return;
 
-	// Check if we have cached data
-	const cacheKey = `storages_${userId}`;
-	const cachedData = localStorage.getItem(cacheKey);
-	const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
-
-	// Use cached data if it exists and is less than 5 minutes old
-	const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-	if (cachedData && cacheTimestamp) {
-		const age = Date.now() - parseInt(cacheTimestamp);
-		if (age < CACHE_DURATION) {
-			console.log("📦 Using cached data (no API charge)");
-			try {
-				const storageList = JSON.parse(cachedData);
-				storages = storageList.map(storage => {
-					const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
-					return parsed;
-				}).filter(s => s !== null);
-
-				renderSelectedItems();
-				calculateRuns();
-				return;
-			} catch (e) {
-				// Fall through to API fetch
-			}
-		}
-	}
-
 	try {
-		console.log("🌐 Auto-refresh: Fetching from API (1 API charge)");
 		const data = await apiFetch(`storages/${userId}`, apiKey);
 		const storageList = data.storages || [];
-
-		// Cache the data
-		localStorage.setItem(cacheKey, JSON.stringify(storageList));
-		localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
-		console.log("💾 Cached storage data for 5 minutes");
 
 		storages = storageList.map(storage => {
 			const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
