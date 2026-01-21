@@ -103,6 +103,14 @@ const ALTERNATIVE_API_URL = "https://d.ttstats.eu/public-main/status/";
 let apiUrl = DEFAULT_API_URL;
 let autoRefreshTimer = null;
 
+// Runtime cache system (like dogg)
+let runningInGame = true; // Assume running in FiveM
+let runtimeCache = {}; // Mutable runtime storage data
+let storagesUpdatedSinceLastRefresh = false;
+let pendingRefresh = false;
+let refreshTimeout = null;
+const REFRESH_IMMEDIATE_DELAY = 100; // ms - debounce delay for updates
+
 // In-app console logging
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
