@@ -217,9 +217,26 @@ function calculateCapacity() {
 	return capacity;
 }
 
+function updateAmountFromStorage() {
+	const sourceStorageId = document.getElementById("sourceStorage").value;
+	const itemType = document.getElementById("itemType").value;
+	
+	if (sourceStorageId && itemType) {
+		const storage = storages.find(s => s.storage.id === sourceStorageId);
+		if (storage) {
+			const item = storage.items.find(i => i.item && i.item.id === itemType);
+			if (item && item.amount > 0) {
+				document.getElementById("itemAmount").value = item.amount;
+				return;
+			}
+		}
+	}
+	document.getElementById("itemAmount").value = 0;
+}
+
 function addItem() {
 	const itemType = document.getElementById("itemType").value;
-	const amount = parseInt(document.getElementById("itemAmount").value) || 0;
+	let amount = parseInt(document.getElementById("itemAmount").value) || 0;
 	const sourceStorageId = document.getElementById("sourceStorage").value;
 	
 	if (!itemType) {
@@ -227,35 +244,27 @@ function addItem() {
 		return;
 	}
 	
-	if (amount <= 0 && sourceStorageId) {
-		// Try to get from storage
-		const storage = storages.find(s => s.storage.id === sourceStorageId);
-		if (storage) {
-			const item = storage.items.find(i => i.item && i.item.id === itemType);
-			if (item && item.amount > 0) {
-				// Add existing item
-				const existingIndex = selectedItems.findIndex(i => i.itemId === itemType);
-				if (existingIndex !== -1) {
-					selectedItems[existingIndex].amount += item.amount;
+	// Auto-detect from source storage if amount is 0
+	if (amount <= 0) {
+		if (sourceStorageId) {
+			const storage = storages.find(s => s.storage.id === sourceStorageId);
+			if (storage) {
+				const item = storage.items.find(i => i.item && i.item.id === itemType);
+				if (item && item.amount > 0) {
+					amount = item.amount;
+					document.getElementById("itemAmount").value = amount;
 				} else {
-					selectedItems.push({
-						itemId: itemType,
-						amount: item.amount
-					});
+					showError(`No ${ITEM_WEIGHTS[itemType]?.name || 'item'} found in selected storage`);
+					return;
 				}
-				renderSelectedItems();
-				calculateRuns();
-				document.getElementById("itemAmount").value = 0;
+			} else {
+				showError("Please enter an amount or select a valid source storage");
 				return;
 			}
+		} else {
+			showError("Please enter an amount or select a source storage");
+			return;
 		}
-		showError("Please enter an amount or select a source storage with items");
-		return;
-	}
-	
-	if (amount <= 0) {
-		showError("Please enter an amount");
-		return;
 	}
 	
 	// Add or update item
@@ -271,13 +280,16 @@ function addItem() {
 	
 	renderSelectedItems();
 	calculateRuns();
-	document.getElementById("itemAmount").value = 0;
+	// Update amount field to show current storage amount after adding
+	updateAmountFromStorage();
+	showError("");
 }
 
 function removeItem(index) {
 	selectedItems.splice(index, 1);
 	renderSelectedItems();
 	calculateRuns();
+	showError("");
 }
 
 function renderSelectedItems() {
@@ -609,35 +621,22 @@ function setupEventListeners() {
 	
 	document.getElementById("sourceStorage").addEventListener("change", function() {
 		saveSettings();
-		// Auto-fill amount when storage is selected and item is selected
-		const itemType = document.getElementById("itemType").value;
-		if (itemType && this.value) {
-			const storage = storages.find(s => s.storage.id === this.value);
-			if (storage) {
-				const item = storage.items.find(i => i.item && i.item.id === itemType);
-				if (item && item.amount > 0) {
-					document.getElementById("itemAmount").value = item.amount;
-				}
-			}
-		}
+		updateAmountFromStorage();
+		calculateRuns();
 	});
 	
 	document.getElementById("destinationStorage").addEventListener("change", function() {
 		saveSettings();
+		calculateRuns();
 	});
 	
 	document.getElementById("itemType").addEventListener("change", function() {
-		// Auto-fill amount when item is selected and storage is selected
-		const sourceStorageId = document.getElementById("sourceStorage").value;
-		if (this.value && sourceStorageId) {
-			const storage = storages.find(s => s.storage.id === sourceStorageId);
-			if (storage) {
-				const item = storage.items.find(i => i.item && i.item.id === this.value);
-				if (item && item.amount > 0) {
-					document.getElementById("itemAmount").value = item.amount;
-				}
-			}
-		}
+		updateAmountFromStorage();
+		calculateRuns();
+	});
+	
+	document.getElementById("itemAmount").addEventListener("input", function() {
+		calculateRuns();
 	});
 	
 	// Mini mode and opacity
