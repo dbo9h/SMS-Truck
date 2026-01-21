@@ -1275,15 +1275,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	});
 
 	console.log("✓ Runs Calculator initialized");
-	console.log("ℹ️ Listening for real-time FiveM storage updates");
-
-	// Request data from FiveM to start receiving updates
-	try {
-		window.postMessage({ type: "getData" }, "*");
-		console.log("📡 Requested initial data from FiveM");
-	} catch (e) {
-		console.log("Not running in FiveM - use API fetch instead");
-	}
+	console.log("ℹ️ Auto-refresh enabled at 1 second (uses cache - minimal API charges)");
 
 	// Automatic refresh functionality
 	let autoRefreshInterval = null;
