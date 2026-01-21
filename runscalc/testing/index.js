@@ -1122,5 +1122,21 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	});
 
+	// Request initial data from FiveM
+	function requestFiveMData() {
+		try {
+			window.postMessage({ type: "getData" }, "*");
+			console.log("📡 Requested data from FiveM");
+		} catch (e) {
+			console.log("Not running in FiveM");
+		}
+	}
+
+	// Request data on load
+	requestFiveMData();
+
+	// Request data every 10 seconds to keep it updated
+	setInterval(requestFiveMData, 10000);
+
 	console.log("✓ Runs Calculator initialized - listening for FiveM storage updates");
 });
