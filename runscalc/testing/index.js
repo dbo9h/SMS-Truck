@@ -104,12 +104,108 @@ let apiUrl = DEFAULT_API_URL;
 let autoRefreshTimer = null;
 
 // Runtime cache system (like dogg)
-let runningInGame = true; // Assume running in FiveM
+let runningInGame = false; // Detected when we get fromTycoonScript message
 let runtimeCache = {}; // Mutable runtime storage data
 let storagesUpdatedSinceLastRefresh = false;
 let pendingRefresh = false;
 let refreshTimeout = null;
 const REFRESH_IMMEDIATE_DELAY = 100; // ms - debounce delay for updates
+
+// Listen for FiveM messages with fromTycoonScript flag
+window.addEventListener("message", function (event) {
+	const data = event.data;
+
+	// Check if message is from FiveM game (has fromTycoonScript flag)
+	if (data && data.fromTycoonScript === true) {
+		// Mark that we're running in game
+		if (!runningInGame) {
+			runningInGame = true;
+			console.log("🎮 Running in FiveM - runtime updates enabled");
+		}
+
+		// Update runtime cache with any storage data
+		for (const key in data) {
+			if (key.startsWith("chest_") || key === "inventory") {
+				try {
+					let inventoryData = data[key];
+					if (typeof inventoryData === 'string') {
+						inventoryData = JSON.parse(inventoryData);
+					}
+
+					if (inventoryData && typeof inventoryData === 'object') {
+						runtimeCache[key] = inventoryData;
+						storagesUpdatedSinceLastRefresh = true;
+
+						// Schedule debounced refresh
+						scheduleRuntimeRefresh();
+					}
+				} catch (e) {
+					// Ignore parse errors
+				}
+			}
+		}
+	}
+});
+
+// Debounced refresh function
+function scheduleRuntimeRefresh() {
+	if (pendingRefresh) return;
+
+	pendingRefresh = true;
+
+	if (refreshTimeout) {
+		clearTimeout(refreshTimeout);
+	}
+
+	refreshTimeout = setTimeout(() => {
+		applyRuntimeCacheToStorages();
+		pendingRefresh = false;
+		storagesUpdatedSinceLastRefresh = false;
+	}, REFRESH_IMMEDIATE_DELAY);
+}
+
+// Apply runtime cache to storage items
+function applyRuntimeCacheToStorages() {
+	if (!runningInGame || Object.keys(runtimeCache).length === 0) return;
+
+	let updated = false;
+
+	storages.forEach(storage => {
+		if (storage && storage.items) {
+			storage.items.forEach(storageItem => {
+				if (storageItem.item) {
+					const itemName = storageItem.item.name;
+					const itemId = storageItem.item.id;
+
+					// Check all cached chests for this item
+					for (const chestKey in runtimeCache) {
+						const chestData = runtimeCache[chestKey];
+
+						if (chestData[itemName] !== undefined) {
+							const newAmount = parseInt(chestData[itemName]) || 0;
+							if (storageItem.amount !== newAmount) {
+								storageItem.amount = newAmount;
+								updated = true;
+							}
+						} else if (chestData[itemId] !== undefined) {
+							const newAmount = parseInt(chestData[itemId]) || 0;
+							if (storageItem.amount !== newAmount) {
+								storageItem.amount = newAmount;
+								updated = true;
+							}
+						}
+					}
+				}
+			});
+		}
+	});
+
+	if (updated) {
+		renderSelectedItems();
+		calculateRuns();
+		console.log("✅ Runtime update applied (0 API charges)");
+	}
+}
 
 // In-app console logging
 const originalConsoleLog = console.log;
