@@ -450,6 +450,7 @@ function calculateRuns() {
 	if (!storage || !storage.items || storage.items.length === 0) {
 		perItemRunsDiv.innerHTML = '<div class="no-items-message">No items in selected storage</div>';
 		totalRunsElement.textContent = "0";
+		console.log("⚠️ No storage found or storage is empty");
 		return;
 	}
 
@@ -460,30 +461,35 @@ function calculateRuns() {
 	// If items are selected, calculate runs for selected items only
 	// If no items selected, calculate runs for ALL items in storage
 	if (selectedItems.length > 0) {
-		// Calculate runs for selected items - use SELECTED amount for runs, show remaining for info
+		console.log(`📊 Calculating runs for ${selectedItems.length} selected items`);
+		// Calculate runs for selected items - use CURRENT STORAGE amount for runs (updates in real-time)
 		selectedItems.forEach(item => {
 			const itemData = ITEM_WEIGHTS[item.itemId];
 			if (!itemData) return;
 
-			// Get remaining items in source storage (for display only)
+			// Get current amount in source storage (this updates with auto-refresh!)
 			const remaining = getRemainingInStorage(item.itemId);
 
-			// Calculate runs based on SELECTED amount (what you're moving), not remaining
-			const amountToCalculate = item.amount;
+			// Use CURRENT storage amount for calculation, not the selected amount
+			// This way runs update when storage changes
+			const amountToCalculate = remaining !== null ? remaining : item.amount;
 
 			const weight = amountToCalculate * itemData.weight;
 			const runs = Math.ceil(weight / capacity);
 			totalRuns += runs;
 			totalWeight += weight;
 
-			const remainingText = remaining !== null ? ` <span style="color: #888; font-size: 0.9em;">(${remaining.toLocaleString()} left)</span>` : '';
+			const remainingText = remaining !== null ? ` <span style="color: #888; font-size: 0.9em;">(${remaining.toLocaleString()} in storage)</span>` : '';
 
 			const runDiv = document.createElement("div");
 			runDiv.className = "per-item-run";
 			runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}${remainingText}`;
 			perItemRunsDiv.appendChild(runDiv);
+
+			console.log(`  - ${itemData.name}: ${runs} runs (${amountToCalculate} items in storage)`);
 		});
 	} else {
+		console.log(`📊 Calculating runs for ALL items in storage (${storage.items.length} items)`);
 		// No items selected, show runs for ALL items in storage
 		storage.items.forEach(storageItem => {
 			if (!storageItem.item || !storageItem.amount) return;
@@ -512,6 +518,7 @@ function calculateRuns() {
 
 	// Update total runs immediately
 	totalRunsElement.textContent = totalRuns.toLocaleString();
+	console.log(`✓ Total runs: ${totalRuns}`);
 }
 
 function populateItemDropdown() {
@@ -627,11 +634,11 @@ async function silentRefreshStorages() {
 			return parsed;
 		}).filter(s => s !== null);
 
-		// Only update UI, don't repopulate dropdowns to avoid resetting selections
-		renderSelectedItems();
-		calculateRuns();
+		// Force complete UI refresh
+		renderSelectedItems(); // Updates "items left" counts
+		calculateRuns(); // Recalculates runs with new storage data
 
-		console.log("🔄 Auto-refreshed storage data");
+		console.log("🔄 Auto-refreshed storage data - UI updated");
 	} catch (error) {
 		// Silently fail - don't interrupt user
 		console.log("⚠️ Auto-refresh failed (silent):", error.message);
