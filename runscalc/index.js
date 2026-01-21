@@ -98,8 +98,9 @@ let initialX = 0;
 let initialY = 0;
 let storages = [];
 let selectedItems = [];
-let gameCache = {}; // Store data from game client
+let gameCache = {}; // Store data from game client (like Dogg's r.cache)
 let userId = null; // Will be set from game data
+let factionId = null; // Will be set from game data
 const DEFAULT_API_URL = "https://tycoon-2epova.users.cfx.re/status/";
 const ALTERNATIVE_API_URL = "https://d.ttstats.eu/public-main/status/";
 let apiUrl = DEFAULT_API_URL;
@@ -523,44 +524,29 @@ async function apiFetch(endpoint, apiKey) {
 	return response.json();
 }
 
-// Update storage from game client data
-function updateStorageFromGameData(storageKey, inventoryData) {
-	if (!storageKey || (!storageKey.startsWith("chest") && storageKey !== "inventory" && storageKey !== "backpack")) {
-		return;
-	}
-	
-	// Parse inventory JSON if it's a string
-	let inventory = {};
-	try {
-		if (typeof inventoryData === 'string') {
-			inventory = inventoryData === "" ? {} : JSON.parse(inventoryData);
-		} else {
-			inventory = inventoryData || {};
-		}
-	} catch (e) {
-		console.error("Failed to parse inventory data:", e);
-		return;
-	}
-	
-	// Parse storage from the key
-	const parsed = parseStorage(storageKey, inventory, userId);
-	if (!parsed) {
-		console.warn(`❌ Failed to parse storage: ${storageKey}`);
-		return;
-	}
-	
-	// Update or add storage
-	const existingIndex = storages.findIndex(s => s.storage.id === parsed.storage.id);
+// Update storage from game cache (like Dogg's Ir function)
+function updateStorage(storageData) {
+	const existingIndex = storages.findIndex(s => s.storage.id === storageData.storage.id);
 	if (existingIndex >= 0) {
-		storages[existingIndex] = parsed;
+		storages[existingIndex] = storageData;
 	} else {
-		storages.push(parsed);
+		storages.push(storageData);
 	}
 	
 	// Update UI
 	populateStorageDropdowns();
 	renderSelectedItems();
 	calculateRuns();
+}
+
+// Parse storage from game data (like Dogg's oe function)
+function parseStorageFromCache(storageKey, inventory, userIdParam, factionIdParam) {
+	const parsed = parseStorage(storageKey, inventory, userIdParam, factionIdParam);
+	if (!parsed) {
+		console.warn(`No storage update found for ${storageKey}`);
+		return null;
+	}
+	return parsed;
 }
 
 async function fetchStorages() {
@@ -578,8 +564,9 @@ async function fetchStorages() {
 		
 		console.log("📦 API returned", storageList.length, "storage names:", storageList.map(s => s.name));
 		
+		const factionId = localStorage.getItem("factionId");
 		storages = storageList.map(storage => {
-			const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
+			const parsed = parseStorage(storage.name, storage.inventory || {}, userId, factionId === "-1" ? null : factionId);
 			if (!parsed) console.warn(`❌ Failed to parse storage: ${storage.name}`);
 			return parsed;
 		}).filter(s => s !== null);
@@ -597,18 +584,13 @@ async function fetchStorages() {
 	}
 }
 
-function parseStorage(storageName, inventory, userIdParam) {
-	// Use userId from parameter or global userId (from game data)
-	const storageUserId = userIdParam || userId;
+function parseStorage(storageName, inventory, userIdParam, factionIdParam) {
+	// Use userId and factionId from parameters or global values
+	const storageUserId = userIdParam || userId || "";
+	const storageFactionId = factionIdParam || factionId || "";
 	
-	// Parse storage ID from name (similar to Dogg's H function)
-	// Handle chest_u{userId} prefix
-	let storageId = storageName;
-	if (storageUserId) {
-		storageId = storageName.replace(new RegExp(`^chest_u${storageUserId}`), "").replace(new RegExp(`^chest_self_storage:${storageUserId}:(.+):chest$`), "$1").replace(/^_/, "");
-	} else {
-		storageId = storageName.replace(/^chest_u\d+/, "").replace(/^chest_self_storage:\d+:(.+):chest$/, "$1").replace(/^_/, "");
-	}
+	// Parse storage ID from name (like Dogg's H function)
+	let storageId = storageName.replace(new RegExp(`^chest_u${storageUserId}`), "").replace(new RegExp(`^chest_self_storage:${storageUserId}:(.+):chest$`), "$1").replace(/^_/, "");
 	
 	// Handle vehicle storage names
 	const vehicleMatch = storageName.match(/^veh_\w+_(.+)$/);
@@ -616,45 +598,20 @@ function parseStorage(storageName, inventory, userIdParam) {
 		storageId = vehicleMatch[1];
 	}
 	
-	// Skip invalid storage names (only if userId is available)
-	if (storageUserId && (/^chest_u\d+/.test(storageName) || /^chest_self_storage:\d+:/.test(storageName))) {
+	// Skip invalid storage names
+	if (/^chest_u\d+/.test(storageName) || /^chest_self_storage:\d+:/.test(storageName)) {
 		return null;
 	}
 	
-	// Handle faq_ storages - treat as valid storage
+	// Handle faq_ storages (like Dogg line 10160)
 	if (storageId.startsWith("faq_")) {
-		// Create a custom storage entry for faq_ storages
-		const customStorage = {
-			name: storageId.replace(/^faq_/, "").replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || storageId,
-			id: storageId,
-			type: "storage"
-		};
-		// Parse items from inventory (same logic as below)
-		const parsedItems = Object.entries(inventory).map(([itemId, itemData]) => {
-			const amount = typeof itemData === 'object' ? itemData.amount : itemData;
-			let cleanItemId = itemId.replace(/(<.+?>)|(&#.+?;)/g, "");
-			if (cleanItemId.startsWith("gut_knife")) {
-				cleanItemId = cleanItemId.split("|")[0];
-			} else if (cleanItemId.startsWith("aircargo")) {
-				return null;
-			}
-			const item = ITEM_WEIGHTS[cleanItemId];
-			if (!item) {
-				if (cleanItemId !== "outfit|ig_furry") {
-					console.info(`Unknown item: ${cleanItemId} in ${storageName}`);
-				}
-				return null;
-			}
-			return {
-				item: { id: cleanItemId, name: item.name, weight: item.weight },
-				amount: amount
-			};
-		}).filter(i => i !== null);
-		
-		return {
-			storage: customStorage,
-			items: parsedItems
-		};
+		// If it matches faction storage pattern, treat as faction
+		if (storageFactionId && storageId === `faq_${storageFactionId}`) {
+			storageId = "faction";
+		} else {
+			// Unknown faq_ storage, return null (like Dogg)
+			return null;
+		}
 	}
 	
 	const storage = getStorageById(storageId);
@@ -895,41 +852,76 @@ document.addEventListener("DOMContentLoaded", function() {
 		localStorage.setItem("panelOpacity", opacity.toString());
 	});
 	
-	// Listen for messages from game client
-	window.addEventListener("message", (event) => {
-		if (!event.data || typeof event.data !== 'object') return;
-		
-		const data = event.data;
+	// Listen for messages from game client (like Dogg line 12096-12107)
+	window.addEventListener("message", ({ data: e }) => {
+		if (!e || typeof e !== 'object') return;
 		
 		// Check if message is from Tycoon script
-		if (data.fromTycoonScript) {
-			// Extract userId from pkey if available
-			if (data.pkey && !userId) {
-				const pkeyParts = data.pkey.split("_");
-				if (pkeyParts.length > 0) {
-					userId = pkeyParts[0];
-					console.log("User ID detected from game:", userId);
-				}
-			}
-			
-			// Update cache with all incoming data
-			for (let [key, value] of Object.entries(data)) {
-				if (key === "menu_choices") {
-					try {
-						gameCache[key] = JSON.parse(value ?? "[]");
-					} catch (e) {
+		if (e.fromTycoonScript) {
+			try {
+				const a = e.data || e; // Dogg uses e.data (line 12103)
+				if (!a || Object.keys(a).length === 0) return;
+				
+				// Step 1: Update cache with all incoming data FIRST (like Dogg line 12106)
+				for (let [key, value] of Object.entries(a)) {
+					if (key === "menu_choices") {
+						try {
+							gameCache[key] = JSON.parse(value ?? "[]");
+						} catch (err) {
+							gameCache[key] = value;
+						}
+					} else {
 						gameCache[key] = value;
 					}
-				} else {
-					gameCache[key] = value;
 				}
-			}
-			
-			// Process storage data (chest_*, inventory, backpack)
-			for (let [key, value] of Object.entries(data)) {
-				if ((key.startsWith("chest") && key !== "chest") || key === "inventory" || key === "backpack") {
-					updateStorageFromGameData(key, value);
+				
+				// Step 2: Process storage data from cache (like Dogg's vr function, line 12005-12008)
+				// Dogg requires userId to be set in input field
+				const currentUserId = document.getElementById("userId")?.value;
+				if (!currentUserId) {
+					// Don't process if userId not set (like Dogg line 11991-11993)
+					return;
 				}
+				
+				// Check if userId matches localStorage (like Dogg line 11995-11997)
+				const savedUserId = localStorage.getItem("userId");
+				if (savedUserId && savedUserId !== currentUserId) {
+					return;
+				}
+				
+				// Get factionId from localStorage (like Dogg line 11999)
+				const currentFactionId = localStorage.getItem("factionId");
+				if (currentFactionId == null) {
+					return;
+				}
+				
+				// Process storage keys from the message (like Dogg line 12005-12008)
+				const keys = Object.keys(a);
+				for (let key of keys) {
+					// Process chest_*, inventory, backpack keys
+					if ((key.startsWith("chest") && key !== "chest") || key === "inventory" || key === "backpack") {
+						try {
+							// Parse inventory from cache (like Dogg line 12007)
+							// Dogg uses: JSON.parse(r.cache[m] === "" ? "{}" : r.cache[m] ?? "{}")
+							const inventoryData = gameCache[key];
+							const inventory = typeof inventoryData === 'string' 
+								? (inventoryData === "" ? {} : JSON.parse(inventoryData))
+								: (inventoryData || {});
+							
+							const parsed = parseStorageFromCache(key, inventory, currentUserId, currentFactionId === "-1" ? null : currentFactionId);
+							if (parsed) {
+								updateStorage(parsed);
+								console.log(`✓ Updated storage: ${key}`, parsed);
+							} else {
+								console.warn(`No storage update found for ${key}`);
+							}
+						} catch (err) {
+							console.error(`Error processing storage ${key}:`, err);
+						}
+					}
+				}
+			} catch (err) {
+				console.error("Error in message handler:", err);
 			}
 		}
 	});
