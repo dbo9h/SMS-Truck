@@ -98,6 +98,8 @@ let initialX = 0;
 let initialY = 0;
 let storages = [];
 let selectedItems = [];
+let gameCache = {}; // Store data from game client
+let userId = null; // Will be set from game data
 const DEFAULT_API_URL = "https://tycoon-2epova.users.cfx.re/status/";
 const ALTERNATIVE_API_URL = "https://d.ttstats.eu/public-main/status/";
 let apiUrl = DEFAULT_API_URL;
@@ -226,6 +228,7 @@ function updateAmountFromStorage() {
 		if (storage) {
 			const item = storage.items.find(i => i.item && i.item.id === itemType);
 			if (item && item.amount > 0) {
+				// Show the ORIGINAL storage amount, not remaining
 				document.getElementById("itemAmount").value = item.amount;
 				return;
 			}
@@ -279,8 +282,6 @@ function addItem() {
 	}
 	
 	renderSelectedItems();
-	calculateRuns();
-	// Update amount field to show current storage amount after adding
 	updateAmountFromStorage();
 	showError("");
 }
@@ -288,8 +289,26 @@ function addItem() {
 function removeItem(index) {
 	selectedItems.splice(index, 1);
 	renderSelectedItems();
-	calculateRuns();
+	updateAmountFromStorage();
 	showError("");
+}
+
+function getRemainingInStorage(itemId) {
+	const sourceStorageId = document.getElementById("sourceStorage").value;
+	if (!sourceStorageId) return null;
+	
+	// Use the EXACT same logic as updateAmountFromStorage()
+	const storage = storages.find(s => s.storage.id === sourceStorageId);
+	if (!storage) return null;
+	
+	const item = storage.items.find(i => i.item && i.item.id === itemId);
+	if (!item) return null;
+	
+	// Return the ACTUAL amount in storage from API (real-time data)
+	// This is what's actually left in storage right now, not calculated
+	const actualAmount = item.amount || 0;
+	
+	return actualAmount;
 }
 
 function renderSelectedItems() {
@@ -297,6 +316,8 @@ function renderSelectedItems() {
 	
 	if (selectedItems.length === 0) {
 		itemsList.innerHTML = '<div class="no-items-message">No items selected. Add items above.</div>';
+		// Recalculate runs when list is empty
+		calculateRuns();
 		return;
 	}
 	
@@ -306,12 +327,15 @@ function renderSelectedItems() {
 		const itemData = ITEM_WEIGHTS[item.itemId];
 		if (!itemData) return;
 		
+		const remaining = getRemainingInStorage(item.itemId);
+		const remainingText = remaining !== null ? ` <span style="color: #888;">(${remaining.toLocaleString()} left)</span>` : '';
+		
 		const entry = document.createElement("div");
 		entry.className = "item-entry";
 		
 		entry.innerHTML = `
 			<span class="item-name">${itemData.name}</span>
-			<span class="item-amount">${item.amount.toLocaleString()}</span>
+			<span class="item-amount">${item.amount.toLocaleString()}${remainingText}</span>
 			<div class="item-controls">
 				<button class="remove-item" onclick="removeItem(${index})" title="Remove item">×</button>
 			</div>
@@ -321,6 +345,8 @@ function renderSelectedItems() {
 	});
 	
 	saveSelectedItems();
+	// Force immediate recalculation
+	calculateRuns();
 }
 
 function saveSelectedItems() {
@@ -344,33 +370,96 @@ function loadSelectedItems() {
 function calculateRuns() {
 	const capacity = calculateCapacity();
 	const perItemRunsDiv = document.getElementById("per-item-runs");
+	const totalRunsElement = document.getElementById("total-runs-required");
+	const trailerCapacityElement = document.getElementById("trailer-capacity");
 	
-	if (selectedItems.length === 0 || capacity === 0) {
-		perItemRunsDiv.innerHTML = '<div class="no-items-message">Add items to calculate runs</div>';
-		document.getElementById("total-runs-required").textContent = "0";
-		document.getElementById("trailer-capacity").textContent = capacity.toLocaleString();
+	if (!perItemRunsDiv || !totalRunsElement || !trailerCapacityElement) {
+		console.error("Results elements not found!");
+		return;
+	}
+	
+	// Update trailer capacity always
+	trailerCapacityElement.textContent = capacity.toLocaleString();
+	
+	if (capacity === 0) {
+		perItemRunsDiv.innerHTML = '<div class="no-items-message">Select a trailer to calculate runs</div>';
+		totalRunsElement.textContent = "0";
+		return;
+	}
+	
+	const sourceStorageId = document.getElementById("sourceStorage").value;
+	if (!sourceStorageId) {
+		perItemRunsDiv.innerHTML = '<div class="no-items-message">Select source storage to calculate runs</div>';
+		totalRunsElement.textContent = "0";
+		return;
+	}
+	
+	const storage = storages.find(s => s.storage.id === sourceStorageId);
+	if (!storage || !storage.items || storage.items.length === 0) {
+		perItemRunsDiv.innerHTML = '<div class="no-items-message">No items in selected storage</div>';
+		totalRunsElement.textContent = "0";
 		return;
 	}
 	
 	let totalRuns = 0;
+	let totalWeight = 0;
 	perItemRunsDiv.innerHTML = "";
 	
-	selectedItems.forEach(item => {
-		const itemData = ITEM_WEIGHTS[item.itemId];
-		if (!itemData) return;
-		
-		const weight = item.amount * itemData.weight;
-		const runs = Math.ceil(weight / capacity);
-		totalRuns += runs;
-		
-		const runDiv = document.createElement("div");
-		runDiv.className = "per-item-run";
-		runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}`;
-		perItemRunsDiv.appendChild(runDiv);
-	});
+	// If items are selected, calculate runs for selected items only
+	// If no items selected, calculate runs for ALL items in storage
+	if (selectedItems.length > 0) {
+		// Calculate runs for selected items - use SELECTED amount for runs, show remaining for info
+		selectedItems.forEach(item => {
+			const itemData = ITEM_WEIGHTS[item.itemId];
+			if (!itemData) return;
+			
+			// Get remaining items in source storage (for display only)
+			const remaining = getRemainingInStorage(item.itemId);
+			
+			// Calculate runs based on SELECTED amount (what you're moving), not remaining
+			const amountToCalculate = item.amount;
+			
+			const weight = amountToCalculate * itemData.weight;
+			const runs = Math.ceil(weight / capacity);
+			totalRuns += runs;
+			totalWeight += weight;
+			
+			const remainingText = remaining !== null ? ` <span style="color: #888; font-size: 0.9em;">(${remaining.toLocaleString()} left)</span>` : '';
+			
+			const runDiv = document.createElement("div");
+			runDiv.className = "per-item-run";
+			runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}${remainingText}`;
+			perItemRunsDiv.appendChild(runDiv);
+		});
+	} else {
+		// No items selected, show runs for ALL items in storage
+		storage.items.forEach(storageItem => {
+			if (!storageItem.item || !storageItem.amount) return;
+			
+			const itemData = ITEM_WEIGHTS[storageItem.item.id];
+			if (!itemData) return;
+			
+			const amountToCalculate = storageItem.amount;
+			const weight = amountToCalculate * itemData.weight;
+			const runs = Math.ceil(weight / capacity);
+			totalRuns += runs;
+			totalWeight += weight;
+			
+			const remainingText = ` <span style="color: #888; font-size: 0.9em;">(${amountToCalculate.toLocaleString()} left)</span>`;
+			
+			const runDiv = document.createElement("div");
+			runDiv.className = "per-item-run";
+			runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}${remainingText}`;
+			perItemRunsDiv.appendChild(runDiv);
+		});
+	}
 	
-	document.getElementById("trailer-capacity").textContent = capacity.toLocaleString();
-	document.getElementById("total-runs-required").textContent = totalRuns.toLocaleString();
+	if (perItemRunsDiv.innerHTML === "") {
+		perItemRunsDiv.innerHTML = '<div class="no-items-message">No items to calculate</div>';
+	}
+	
+	// Update total runs immediately
+	totalRunsElement.textContent = totalRuns.toLocaleString();
 }
 
 function populateItemDropdown() {
@@ -434,6 +523,46 @@ async function apiFetch(endpoint, apiKey) {
 	return response.json();
 }
 
+// Update storage from game client data
+function updateStorageFromGameData(storageKey, inventoryData) {
+	if (!storageKey || (!storageKey.startsWith("chest") && storageKey !== "inventory" && storageKey !== "backpack")) {
+		return;
+	}
+	
+	// Parse inventory JSON if it's a string
+	let inventory = {};
+	try {
+		if (typeof inventoryData === 'string') {
+			inventory = inventoryData === "" ? {} : JSON.parse(inventoryData);
+		} else {
+			inventory = inventoryData || {};
+		}
+	} catch (e) {
+		console.error("Failed to parse inventory data:", e);
+		return;
+	}
+	
+	// Parse storage from the key
+	const parsed = parseStorage(storageKey, inventory, userId);
+	if (!parsed) {
+		console.warn(`❌ Failed to parse storage: ${storageKey}`);
+		return;
+	}
+	
+	// Update or add storage
+	const existingIndex = storages.findIndex(s => s.storage.id === parsed.storage.id);
+	if (existingIndex >= 0) {
+		storages[existingIndex] = parsed;
+	} else {
+		storages.push(parsed);
+	}
+	
+	// Update UI
+	populateStorageDropdowns();
+	renderSelectedItems();
+	calculateRuns();
+}
+
 async function fetchStorages() {
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
@@ -458,6 +587,9 @@ async function fetchStorages() {
 		console.log("✓ Successfully parsed", storages.length, "storages");
 		
 		populateStorageDropdowns();
+		// Update remaining counts and recalculate when storage is refreshed
+		renderSelectedItems();
+		calculateRuns();
 		showError("");
 	} catch (error) {
 		console.error("Failed to fetch storages:", error);
@@ -465,9 +597,18 @@ async function fetchStorages() {
 	}
 }
 
-function parseStorage(storageName, inventory, userId) {
+function parseStorage(storageName, inventory, userIdParam) {
+	// Use userId from parameter or global userId (from game data)
+	const storageUserId = userIdParam || userId;
+	
 	// Parse storage ID from name (similar to Dogg's H function)
-	let storageId = storageName.replace(/^chest_u\d+/, "").replace(/^chest_self_storage:\d+:(.+):chest$/, "$1").replace(/^_/, "");
+	// Handle chest_u{userId} prefix
+	let storageId = storageName;
+	if (storageUserId) {
+		storageId = storageName.replace(new RegExp(`^chest_u${storageUserId}`), "").replace(new RegExp(`^chest_self_storage:${storageUserId}:(.+):chest$`), "$1").replace(/^_/, "");
+	} else {
+		storageId = storageName.replace(/^chest_u\d+/, "").replace(/^chest_self_storage:\d+:(.+):chest$/, "$1").replace(/^_/, "");
+	}
 	
 	// Handle vehicle storage names
 	const vehicleMatch = storageName.match(/^veh_\w+_(.+)$/);
@@ -475,9 +616,45 @@ function parseStorage(storageName, inventory, userId) {
 		storageId = vehicleMatch[1];
 	}
 	
-	// Skip invalid storage names
-	if (/^chest_u\d+/.test(storageName) || /^chest_self_storage:\d+:/.test(storageName)) {
+	// Skip invalid storage names (only if userId is available)
+	if (storageUserId && (/^chest_u\d+/.test(storageName) || /^chest_self_storage:\d+:/.test(storageName))) {
 		return null;
+	}
+	
+	// Handle faq_ storages - treat as valid storage
+	if (storageId.startsWith("faq_")) {
+		// Create a custom storage entry for faq_ storages
+		const customStorage = {
+			name: storageId.replace(/^faq_/, "").replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) || storageId,
+			id: storageId,
+			type: "storage"
+		};
+		// Parse items from inventory (same logic as below)
+		const parsedItems = Object.entries(inventory).map(([itemId, itemData]) => {
+			const amount = typeof itemData === 'object' ? itemData.amount : itemData;
+			let cleanItemId = itemId.replace(/(<.+?>)|(&#.+?;)/g, "");
+			if (cleanItemId.startsWith("gut_knife")) {
+				cleanItemId = cleanItemId.split("|")[0];
+			} else if (cleanItemId.startsWith("aircargo")) {
+				return null;
+			}
+			const item = ITEM_WEIGHTS[cleanItemId];
+			if (!item) {
+				if (cleanItemId !== "outfit|ig_furry") {
+					console.info(`Unknown item: ${cleanItemId} in ${storageName}`);
+				}
+				return null;
+			}
+			return {
+				item: { id: cleanItemId, name: item.name, weight: item.weight },
+				amount: amount
+			};
+		}).filter(i => i !== null);
+		
+		return {
+			storage: customStorage,
+			items: parsedItems
+		};
 	}
 	
 	const storage = getStorageById(storageId);
@@ -622,8 +799,11 @@ function setupEventListeners() {
 	document.getElementById("sourceStorage").addEventListener("change", function() {
 		saveSettings();
 		updateAmountFromStorage();
+		// Force recalculation when storage changes
+		renderSelectedItems();
 		calculateRuns();
 	});
+	
 	
 	document.getElementById("destinationStorage").addEventListener("change", function() {
 		saveSettings();
@@ -632,6 +812,7 @@ function setupEventListeners() {
 	
 	document.getElementById("itemType").addEventListener("change", function() {
 		updateAmountFromStorage();
+		renderSelectedItems(); // Re-render to update remaining counts
 		calculateRuns();
 	});
 	
@@ -714,7 +895,46 @@ document.addEventListener("DOMContentLoaded", function() {
 		localStorage.setItem("panelOpacity", opacity.toString());
 	});
 	
-	// Load storages if API key exists
+	// Listen for messages from game client
+	window.addEventListener("message", (event) => {
+		if (!event.data || typeof event.data !== 'object') return;
+		
+		const data = event.data;
+		
+		// Check if message is from Tycoon script
+		if (data.fromTycoonScript) {
+			// Extract userId from pkey if available
+			if (data.pkey && !userId) {
+				const pkeyParts = data.pkey.split("_");
+				if (pkeyParts.length > 0) {
+					userId = pkeyParts[0];
+					console.log("User ID detected from game:", userId);
+				}
+			}
+			
+			// Update cache with all incoming data
+			for (let [key, value] of Object.entries(data)) {
+				if (key === "menu_choices") {
+					try {
+						gameCache[key] = JSON.parse(value ?? "[]");
+					} catch (e) {
+						gameCache[key] = value;
+					}
+				} else {
+					gameCache[key] = value;
+				}
+			}
+			
+			// Process storage data (chest_*, inventory, backpack)
+			for (let [key, value] of Object.entries(data)) {
+				if ((key.startsWith("chest") && key !== "chest") || key === "inventory" || key === "backpack") {
+					updateStorageFromGameData(key, value);
+				}
+			}
+		}
+	});
+	
+	// Load storages if API key exists (fallback for manual refresh)
 	if (savedApiKey && savedUserId) {
 		fetchStorages().then(() => {
 			// Reload settings after storages are loaded to restore storage selections
