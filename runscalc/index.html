@@ -11,6 +11,7 @@
 		<div class="user-input">
 			<div class="button-container">
 				<button class="toggle-settings" onclick="toggleSettings()">☰</button>
+				<button class="toggle-mini-mode" onclick="toggleMiniMode()" title="Toggle Mini Mode">📐</button>
 			</div>
 			<div class="collapsible">
 				<!-- User Settings Submenu -->
@@ -23,6 +24,8 @@
 						<input type="password" id="apiKey" placeholder="Enter API Key" />
 						<label for="userId">User ID:</label>
 						<input type="number" id="userId" placeholder="Enter User ID" />
+						<label for="alternativeApi">Alternative API:</label>
+						<input type="checkbox" id="alternativeApi" />
 						<div style="grid-column: span 2; display: flex; justify-content: space-around; margin-top: 5px;">
 							<button onclick="saveApiKey()">Save API Key</button>
 							<button onclick="refresh()" title="Uses 3 API charges per refresh">Refresh</button>
@@ -85,30 +88,50 @@
 						Item Transfer <span class="submenu-toggle">▼</span>
 					</div>
 					<div class="submenu-content">
-						<label for="itemType">Item Type:</label>
-						<select id="itemType"></select>
-						<label for="currentItems">Current Items:</label>
-						<input type="number" id="currentItems" placeholder="Auto-filled from storage" min="0" value="0" readonly />
-						<label for="moveAll">Move All Items:</label>
-						<input type="checkbox" id="moveAll" checked />
-						<label for="moveAmount">Move Specific Amount:</label>
-						<input type="number" id="moveAmount" placeholder="Enter amount to move" min="0" value="0" disabled />
+						<div class="items-selection-container" style="grid-column: span 2;">
+							<div class="items-list" id="selected-items-list">
+								<!-- Selected items will appear here -->
+							</div>
+							<div class="item-add-container">
+								<div class="item-add-row">
+									<select id="itemType" class="item-dropdown"></select>
+									<input type="number" id="itemAmount" placeholder="Amount" value="0" class="item-amount-input" min="0" />
+									<button onclick="addItem()" class="add-item-btn">Add</button>
+								</div>
+							</div>
+						</div>
 					</div>
 				</div>
 
 				<!-- Results Submenu -->
-				<div class="submenu">
+				<div class="submenu results-submenu">
 					<div class="submenu-header" onclick="toggleSubmenu(this)">
 						Results <span class="submenu-toggle">▼</span>
 					</div>
 					<div class="submenu-content">
-						<div style="grid-column: span 2;">Total Items: <span id="total-items">0</span></div>
-						<div style="grid-column: span 2;">Item Weight: <span id="item-weight">0</span> kg per item</div>
-						<div style="grid-column: span 2;">Total Weight: <span id="total-weight">0</span> kg</div>
 						<div style="grid-column: span 2;">Trailer Capacity: <span id="trailer-capacity">0</span> kg</div>
-						<div style="grid-column: span 2;">Items to Move: <span id="items-to-move">0</span></div>
-						<div style="grid-column: span 2;">Weight to Move: <span id="weight-to-move">0</span> kg</div>
-						<div style="grid-column: span 2;">Runs Required: <span id="runs-required">0</span></div>
+						<div style="grid-column: span 2; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+							<strong>Per Item Runs:</strong>
+						</div>
+						<div id="per-item-runs" style="grid-column: span 2;">
+							<!-- Per-item runs will appear here -->
+						</div>
+						<div style="grid-column: span 2; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+							<strong>Total Runs Required: <span id="total-runs-required">0</span></strong>
+						</div>
+					</div>
+				</div>
+
+				<!-- Appearance Settings Submenu -->
+				<div class="submenu appearance-submenu">
+					<div class="submenu-header" onclick="toggleSubmenu(this)">
+						Appearance Settings <span class="submenu-toggle">▼</span>
+					</div>
+					<div class="submenu-content">
+						<label for="miniMode">Mini Mode:</label>
+						<input type="checkbox" id="miniMode" />
+						<label for="panelOpacity">Panel Opacity:</label>
+						<input type="range" id="panelOpacity" min="0.1" max="1" step="0.1" value="1" />
 					</div>
 				</div>
 			</div>

@@ -97,7 +97,10 @@ let dragStartY = 0;
 let initialX = 0;
 let initialY = 0;
 let storages = [];
-const API_URL = "https://api.rp3.com";
+let selectedItems = [];
+const DEFAULT_API_URL = "https://tycoon-2epova.users.cfx.re/status/";
+const ALTERNATIVE_API_URL = "https://d.ttstats.eu/public-main/status/";
+let apiUrl = DEFAULT_API_URL;
 
 function toggleSettings() {
 	const userInput = document.getElementById("main").querySelector(".user-input");
@@ -212,73 +215,148 @@ function calculateCapacity() {
 	return capacity;
 }
 
-function updateItemCountFromStorage() {
-	const sourceStorageId = document.getElementById("sourceStorage").value;
+function addItem() {
 	const itemType = document.getElementById("itemType").value;
+	const amount = parseInt(document.getElementById("itemAmount").value) || 0;
+	const sourceStorageId = document.getElementById("sourceStorage").value;
 	
-	if (!sourceStorageId || !itemType) {
-		document.getElementById("currentItems").value = 0;
-		calculateRuns();
+	if (!itemType) {
+		showError("Please select an item type");
 		return;
 	}
 	
-	// Find the storage
-	const storage = storages.find(s => s.storage.id === sourceStorageId);
-	if (!storage) {
-		document.getElementById("currentItems").value = 0;
-		calculateRuns();
+	if (amount <= 0 && sourceStorageId) {
+		// Try to get from storage
+		const storage = storages.find(s => s.storage.id === sourceStorageId);
+		if (storage) {
+			const item = storage.items.find(i => i.item && i.item.id === itemType);
+			if (item && item.amount > 0) {
+				// Add existing item
+				const existingIndex = selectedItems.findIndex(i => i.itemId === itemType);
+				if (existingIndex !== -1) {
+					selectedItems[existingIndex].amount += item.amount;
+				} else {
+					selectedItems.push({
+						itemId: itemType,
+						amount: item.amount
+					});
+				}
+				renderSelectedItems();
+				calculateRuns();
+				document.getElementById("itemAmount").value = 0;
+				return;
+			}
+		}
+		showError("Please enter an amount or select a source storage with items");
 		return;
 	}
 	
-	// Find the item in storage
-	const item = storage.items.find(i => i.item && i.item.id === itemType);
-	const count = item ? item.amount : 0;
+	if (amount <= 0) {
+		showError("Please enter an amount");
+		return;
+	}
 	
-	document.getElementById("currentItems").value = count;
+	// Add or update item
+	const existingIndex = selectedItems.findIndex(i => i.itemId === itemType);
+	if (existingIndex !== -1) {
+		selectedItems[existingIndex].amount += amount;
+	} else {
+		selectedItems.push({
+			itemId: itemType,
+			amount: amount
+		});
+	}
+	
+	renderSelectedItems();
+	calculateRuns();
+	document.getElementById("itemAmount").value = 0;
+}
+
+function removeItem(index) {
+	selectedItems.splice(index, 1);
+	renderSelectedItems();
 	calculateRuns();
 }
 
+function renderSelectedItems() {
+	const itemsList = document.getElementById("selected-items-list");
+	
+	if (selectedItems.length === 0) {
+		itemsList.innerHTML = '<div class="no-items-message">No items selected. Add items above.</div>';
+		return;
+	}
+	
+	itemsList.innerHTML = "";
+	
+	selectedItems.forEach((item, index) => {
+		const itemData = ITEM_WEIGHTS[item.itemId];
+		if (!itemData) return;
+		
+		const entry = document.createElement("div");
+		entry.className = "item-entry";
+		
+		entry.innerHTML = `
+			<span class="item-name">${itemData.name}</span>
+			<span class="item-amount">${item.amount.toLocaleString()}</span>
+			<div class="item-controls">
+				<button class="remove-item" onclick="removeItem(${index})" title="Remove item">×</button>
+			</div>
+		`;
+		
+		itemsList.appendChild(entry);
+	});
+	
+	saveSelectedItems();
+}
+
+function saveSelectedItems() {
+	localStorage.setItem("selectedItems", JSON.stringify(selectedItems));
+}
+
+function loadSelectedItems() {
+	try {
+		const saved = localStorage.getItem("selectedItems");
+		if (saved) {
+			selectedItems = JSON.parse(saved);
+			selectedItems = selectedItems.filter(item => ITEM_WEIGHTS[item.itemId] !== undefined);
+			renderSelectedItems();
+		}
+	} catch (e) {
+		console.error("Failed to load selected items:", e);
+		selectedItems = [];
+	}
+}
+
 function calculateRuns() {
-	const itemType = document.getElementById("itemType").value;
-	const currentItems = parseInt(document.getElementById("currentItems").value) || 0;
-	const moveAll = document.getElementById("moveAll").checked;
-	const moveAmount = parseInt(document.getElementById("moveAmount").value) || 0;
 	const capacity = calculateCapacity();
+	const perItemRunsDiv = document.getElementById("per-item-runs");
 	
-	// Get item weight
-	let itemWeight = 0;
-	if (itemType && ITEM_WEIGHTS[itemType]) {
-		itemWeight = ITEM_WEIGHTS[itemType].weight;
+	if (selectedItems.length === 0 || capacity === 0) {
+		perItemRunsDiv.innerHTML = '<div class="no-items-message">Add items to calculate runs</div>';
+		document.getElementById("total-runs-required").textContent = "0";
+		document.getElementById("trailer-capacity").textContent = capacity.toLocaleString();
+		return;
 	}
 	
-	// Calculate total weight
-	const totalWeight = currentItems * itemWeight;
+	let totalRuns = 0;
+	perItemRunsDiv.innerHTML = "";
 	
-	// Determine items to move
-	let itemsToMove = 0;
-	if (moveAll) {
-		itemsToMove = currentItems;
-	} else {
-		itemsToMove = Math.min(moveAmount, currentItems);
-	}
+	selectedItems.forEach(item => {
+		const itemData = ITEM_WEIGHTS[item.itemId];
+		if (!itemData) return;
+		
+		const weight = item.amount * itemData.weight;
+		const runs = Math.ceil(weight / capacity);
+		totalRuns += runs;
+		
+		const runDiv = document.createElement("div");
+		runDiv.className = "per-item-run";
+		runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}`;
+		perItemRunsDiv.appendChild(runDiv);
+	});
 	
-	// Calculate weight to move
-	const weightToMove = itemsToMove * itemWeight;
-	
-	// Calculate runs required based on weight
-	let runsRequired = 0;
-	if (capacity > 0 && weightToMove > 0) {
-		runsRequired = Math.ceil(weightToMove / capacity);
-	}
-	
-	// Update display
-	document.getElementById("total-items").textContent = currentItems.toLocaleString();
-	document.getElementById("item-weight").textContent = itemWeight.toLocaleString();
-	document.getElementById("total-weight").textContent = totalWeight.toLocaleString();
 	document.getElementById("trailer-capacity").textContent = capacity.toLocaleString();
-	document.getElementById("items-to-move").textContent = itemsToMove.toLocaleString();
-	document.getElementById("weight-to-move").textContent = weightToMove.toLocaleString();
-	document.getElementById("runs-required").textContent = runsRequired.toLocaleString();
+	document.getElementById("total-runs-required").textContent = totalRuns.toLocaleString();
 }
 
 function populateItemDropdown() {
@@ -320,6 +398,28 @@ function populateStorageDropdowns() {
 	});
 }
 
+async function apiFetch(endpoint, apiKey) {
+	const response = await fetch(apiUrl + endpoint, {
+		headers: {
+			"X-Tycoon-Key": apiKey
+		}
+	});
+	
+	if (!response.ok) {
+		let errorMsg;
+		if (response.status === 402) {
+			errorMsg = "No api charges remaining";
+		} else if (response.status === 403) {
+			errorMsg = "Invalid api key";
+		} else {
+			errorMsg = await response.text().catch(() => "Unknown");
+		}
+		throw new Error(`Failed to fetch api: (${response.status}) ${errorMsg || response.statusText}`);
+	}
+	
+	return response.json();
+}
+
 async function fetchStorages() {
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
@@ -330,20 +430,20 @@ async function fetchStorages() {
 	}
 	
 	try {
-		const response = await fetch(`${API_URL}/storages/${userId}`, {
-			headers: {
-				"Authorization": `Bearer ${apiKey}`
-			}
-		});
+		const data = await apiFetch(`storages/${userId}`, apiKey);
+		const storageList = data.storages || [];
 		
-		if (!response.ok) {
-			throw new Error(`API Error: ${response.status}`);
-		}
+		console.log("📦 API returned", storageList.length, "storage names:", storageList.map(s => s.name));
 		
-		const data = await response.json();
-		storages = parseStorages(data.storages || {});
+		storages = storageList.map(storage => {
+			const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
+			if (!parsed) console.warn(`❌ Failed to parse storage: ${storage.name}`);
+			return parsed;
+		}).filter(s => s !== null);
+		
+		console.log("✓ Successfully parsed", storages.length, "storages");
+		
 		populateStorageDropdowns();
-		updateItemCountFromStorage();
 		showError("");
 	} catch (error) {
 		console.error("Failed to fetch storages:", error);
@@ -351,29 +451,65 @@ async function fetchStorages() {
 	}
 }
 
-function parseStorages(storageData) {
-	const userId = localStorage.getItem("userId");
-	const factionId = localStorage.getItem("factionId");
+function parseStorage(storageName, inventory, userId) {
+	// Parse storage ID from name (similar to Dogg's H function)
+	let storageId = storageName.replace(/^chest_u\d+/, "").replace(/^chest_self_storage:\d+:(.+):chest$/, "$1").replace(/^_/, "");
 	
-	return Object.entries(storageData).map(([id, items]) => {
-		const storage = getStorageById(id, userId, factionId);
-		if (!storage) return null;
+	// Handle vehicle storage names
+	const vehicleMatch = storageName.match(/^veh_\w+_(.+)$/);
+	if (vehicleMatch) {
+		storageId = vehicleMatch[1];
+	}
+	
+	// Skip invalid storage names
+	if (/^chest_u\d+/.test(storageName) || /^chest_self_storage:\d+:/.test(storageName)) {
+		return null;
+	}
+	
+	const storage = getStorageById(storageId);
+	if (!storage) {
+		console.warn(`Unknown storage: '${storageId}', assuming vehicle`);
+		return {
+			storage: { name: storageName, id: storageId, type: "vehicle" },
+			items: []
+		};
+	}
+	
+	// Parse items from inventory
+	const parsedItems = Object.entries(inventory).map(([itemId, itemData]) => {
+		const amount = typeof itemData === 'object' ? itemData.amount : itemData;
 		
-		const parsedItems = Object.entries(items).map(([itemId, itemData]) => {
-			const amount = typeof itemData === 'object' ? itemData.amount : itemData;
-			const item = ITEM_WEIGHTS[itemId];
-			if (!item) return null;
-			return { item: { id: itemId, name: item.name, weight: item.weight }, amount: amount };
-		}).filter(i => i !== null);
+		// Clean item ID (remove HTML tags and entities like Dogg does)
+		let cleanItemId = itemId.replace(/(<.+?>)|(&#.+?;)/g, "");
+		
+		// Handle special cases
+		if (cleanItemId.startsWith("gut_knife")) {
+			cleanItemId = cleanItemId.split("|")[0];
+		} else if (cleanItemId.startsWith("aircargo")) {
+			return null;
+		}
+		
+		const item = ITEM_WEIGHTS[cleanItemId];
+		if (!item) {
+			if (cleanItemId !== "outfit|ig_furry") {
+				console.info(`Unknown item: ${cleanItemId} in ${storageName}`);
+			}
+			return null;
+		}
 		
 		return {
-			storage: storage,
-			items: parsedItems
+			item: { id: cleanItemId, name: item.name, weight: item.weight },
+			amount: amount
 		};
-	}).filter(s => s !== null);
+	}).filter(i => i !== null);
+	
+	return {
+		storage: storage,
+		items: parsedItems
+	};
 }
 
-function getStorageById(id, userId, factionId) {
+function getStorageById(id) {
 	// Common storage IDs from Dogg
 	const storageMap = {
 		"biz_train": { name: "Trainyard Storage", id: "biz_train", type: "storage" },
@@ -391,12 +527,13 @@ function getStorageById(id, userId, factionId) {
 		"bats": { name: "Rogers Salvage & Scrap", id: "bats", type: "storage" }
 	};
 	
-	return storageMap[id] || { name: id, id: id, type: "storage" };
+	return storageMap[id] || null;
 }
 
 function saveApiKey() {
 	const apiKey = document.getElementById("apiKey").value;
 	const userId = document.getElementById("userId").value;
+	const alternativeApi = document.getElementById("alternativeApi").checked;
 	
 	if (!apiKey || !userId) {
 		showError("Please enter both API Key and User ID");
@@ -405,6 +542,10 @@ function saveApiKey() {
 	
 	localStorage.setItem("apiKey", apiKey);
 	localStorage.setItem("userId", userId);
+	localStorage.setItem("alternativeApi", alternativeApi ? "true" : "false");
+	
+	apiUrl = alternativeApi ? ALTERNATIVE_API_URL : DEFAULT_API_URL;
+	
 	showError("API Key saved!");
 	setTimeout(() => showError(""), 2000);
 }
@@ -418,18 +559,6 @@ function showError(message) {
 }
 
 function setupEventListeners() {
-	// Toggle move all / specific amount
-	document.getElementById("moveAll").addEventListener("change", function() {
-		const moveAmountInput = document.getElementById("moveAmount");
-		if (this.checked) {
-			moveAmountInput.disabled = true;
-			moveAmountInput.value = 0;
-		} else {
-			moveAmountInput.disabled = false;
-		}
-		calculateRuns();
-	});
-	
 	// Calculate on input changes
 	document.getElementById("mk15").addEventListener("change", function() {
 		if (this.checked) {
@@ -447,10 +576,65 @@ function setupEventListeners() {
 	
 	document.getElementById("postop").addEventListener("change", calculateRuns);
 	document.getElementById("premium").addEventListener("change", calculateRuns);
-	document.getElementById("itemType").addEventListener("change", updateItemCountFromStorage);
-	document.getElementById("sourceStorage").addEventListener("change", updateItemCountFromStorage);
-	document.getElementById("currentItems").addEventListener("input", calculateRuns);
-	document.getElementById("moveAmount").addEventListener("input", calculateRuns);
+	
+	document.getElementById("sourceStorage").addEventListener("change", function() {
+		// Auto-fill amount when storage is selected and item is selected
+		const itemType = document.getElementById("itemType").value;
+		if (itemType && this.value) {
+			const storage = storages.find(s => s.storage.id === this.value);
+			if (storage) {
+				const item = storage.items.find(i => i.item && i.item.id === itemType);
+				if (item && item.amount > 0) {
+					document.getElementById("itemAmount").value = item.amount;
+				}
+			}
+		}
+	});
+	document.getElementById("itemType").addEventListener("change", function() {
+		// Auto-fill amount when item is selected and storage is selected
+		const sourceStorageId = document.getElementById("sourceStorage").value;
+		if (this.value && sourceStorageId) {
+			const storage = storages.find(s => s.storage.id === sourceStorageId);
+			if (storage) {
+				const item = storage.items.find(i => i.item && i.item.id === this.value);
+				if (item && item.amount > 0) {
+					document.getElementById("itemAmount").value = item.amount;
+				}
+			}
+		}
+	});
+	
+	// Mini mode and opacity
+	document.getElementById("miniMode").addEventListener("change", function() {
+		toggleMiniModeUI(this.checked);
+		localStorage.setItem("miniMode", this.checked ? "true" : "false");
+	});
+}
+
+function toggleMiniMode() {
+	const miniModeCheckbox = document.getElementById("miniMode");
+	miniModeCheckbox.checked = !miniModeCheckbox.checked;
+	toggleMiniModeUI(miniModeCheckbox.checked);
+	localStorage.setItem("miniMode", miniModeCheckbox.checked ? "true" : "false");
+}
+
+function toggleMiniModeUI(enabled) {
+	const userInput = document.getElementById("main").querySelector(".user-input");
+	if (enabled) {
+		userInput.classList.add("mini-mode");
+		// Expand results submenu in mini mode
+		const resultsSubmenu = userInput.querySelector(".results-submenu");
+		if (resultsSubmenu) {
+			const content = resultsSubmenu.querySelector(".submenu-content");
+			const toggle = resultsSubmenu.querySelector(".submenu-toggle");
+			if (content.classList.contains("collapsed")) {
+				content.classList.remove("collapsed");
+				toggle.classList.remove("collapsed");
+			}
+		}
+	} else {
+		userInput.classList.remove("mini-mode");
+	}
 }
 
 // Initialize
@@ -458,12 +642,39 @@ document.addEventListener("DOMContentLoaded", function() {
 	// Load saved API key and user ID
 	const savedApiKey = localStorage.getItem("apiKey");
 	const savedUserId = localStorage.getItem("userId");
+	const savedAlternativeApi = localStorage.getItem("alternativeApi") === "true";
+	const savedMiniMode = localStorage.getItem("miniMode") === "true";
+	const savedOpacity = localStorage.getItem("panelOpacity");
+	
 	if (savedApiKey) document.getElementById("apiKey").value = savedApiKey;
 	if (savedUserId) document.getElementById("userId").value = savedUserId;
+	if (savedAlternativeApi) {
+		document.getElementById("alternativeApi").checked = true;
+		apiUrl = ALTERNATIVE_API_URL;
+	}
+	if (savedMiniMode) {
+		document.getElementById("miniMode").checked = true;
+		toggleMiniModeUI(true);
+	}
+	if (savedOpacity) {
+		const opacity = parseFloat(savedOpacity);
+		document.getElementById("panelOpacity").value = opacity;
+		const userInput = document.getElementById("main").querySelector(".user-input");
+		userInput.style.opacity = opacity;
+	}
 	
 	populateItemDropdown();
 	setupEventListeners();
 	initDragging();
+	loadSelectedItems();
+	
+	// Panel opacity listener
+	document.getElementById("panelOpacity").addEventListener("input", function() {
+		const userInput = document.getElementById("main").querySelector(".user-input");
+		const opacity = parseFloat(this.value);
+		userInput.style.opacity = opacity;
+		localStorage.setItem("panelOpacity", opacity.toString());
+	});
 	
 	// Load storages if API key exists
 	if (savedApiKey && savedUserId) {
