@@ -720,9 +720,46 @@ async function fetchStorages() {
 		return;
 	}
 
+	// Check if we have cached data
+	const cacheKey = `storages_${userId}`;
+	const cachedData = localStorage.getItem(cacheKey);
+	const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
+
+	// Use cached data if it exists and is less than 5 minutes old
+	const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+	if (cachedData && cacheTimestamp) {
+		const age = Date.now() - parseInt(cacheTimestamp);
+		if (age < CACHE_DURATION) {
+			console.log("📦 Using cached storage data (no API charge!)");
+			try {
+				const storageList = JSON.parse(cachedData);
+				storages = storageList.map(storage => {
+					const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
+					if (!parsed) console.warn(`❌ Failed to parse storage: ${storage.name}`);
+					return parsed;
+				}).filter(s => s !== null);
+
+				console.log("✓ Successfully loaded", storages.length, "storages from cache");
+				populateStorageDropdowns();
+				renderSelectedItems();
+				calculateRuns();
+				showError("");
+				return;
+			} catch (e) {
+				console.warn("Failed to load cache, fetching from API");
+			}
+		}
+	}
+
 	try {
+		console.log("🌐 Fetching from API (1 API charge)");
 		const data = await apiFetch(`storages/${userId}`, apiKey);
 		const storageList = data.storages || [];
+
+		// Cache the data
+		localStorage.setItem(cacheKey, JSON.stringify(storageList));
+		localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
+		console.log("💾 Cached storage data for 5 minutes");
 
 		console.log("📦 API returned", storageList.length, "storage names:", storageList.map(s => s.name));
 
@@ -805,27 +842,54 @@ async function silentRefreshStorages() {
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
 
-	if (!apiKey || !userId) {
-		return; // Silently skip if no credentials
+	if (!apiKey || !userId) return;
+
+	// Check if we have cached data
+	const cacheKey = `storages_${userId}`;
+	const cachedData = localStorage.getItem(cacheKey);
+	const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
+
+	// Use cached data if it exists and is less than 5 minutes old
+	const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+	if (cachedData && cacheTimestamp) {
+		const age = Date.now() - parseInt(cacheTimestamp);
+		if (age < CACHE_DURATION) {
+			console.log("📦 Using cached data (no API charge)");
+			try {
+				const storageList = JSON.parse(cachedData);
+				storages = storageList.map(storage => {
+					const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
+					return parsed;
+				}).filter(s => s !== null);
+
+				renderSelectedItems();
+				calculateRuns();
+				return;
+			} catch (e) {
+				// Fall through to API fetch
+			}
+		}
 	}
 
 	try {
+		console.log("🌐 Auto-refresh: Fetching from API (1 API charge)");
 		const data = await apiFetch(`storages/${userId}`, apiKey);
 		const storageList = data.storages || [];
+
+		// Cache the data
+		localStorage.setItem(cacheKey, JSON.stringify(storageList));
+		localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
+		console.log("💾 Cached storage data for 5 minutes");
 
 		storages = storageList.map(storage => {
 			const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
 			return parsed;
 		}).filter(s => s !== null);
 
-		// Force complete UI refresh
-		renderSelectedItems(); // Updates "items left" counts
-		calculateRuns(); // Recalculates runs with new storage data
-
-		console.log("🔄 Auto-refreshed storage data - UI updated");
+		renderSelectedItems();
+		calculateRuns();
 	} catch (error) {
-		// Silently fail - don't interrupt user
-		console.log("⚠️ Auto-refresh failed (silent):", error.message);
+		console.error("Silent refresh failed:", error);
 	}
 }
 
@@ -1185,35 +1249,41 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			}
 
-			// Handle FiveM chest data (chest_[id] contains storage inventory)
-			// Check for any keys starting with "chest_"
+			// FiveM sends data as key-value pairs
+			// Look for ANY chest_ keys (storage data)
+			let foundStorageData = false;
+
 			for (const key in data) {
+				// Handle chest data (chest_[id] contains storage inventory)
 				if (key.startsWith("chest_")) {
-					console.log(`📦 Chest data received: ${key}`);
-					console.log(JSON.stringify(data[key], null, 2));
+					console.log(`📦 Storage update: ${key}`);
 					const chestData = typeof data[key] === "string" ? JSON.parse(data[key]) : data[key];
 					updateStorageFromChest(key, chestData);
-					return;
+					foundStorageData = true;
 				}
 			}
 
-			// Handle inventory data (player's current inventory)
-			if (data.inventory) {
-				console.log(`🎒 Inventory data received`);
-				const inventoryData = typeof data.inventory === "string" ? JSON.parse(data.inventory) : data.inventory;
-				updateStorageFromChest("player_inventory", inventoryData);
-				return;
+			// If we got storage data, update the UI
+			if (foundStorageData) {
+				renderSelectedItems();
+				calculateRuns();
 			}
 
-			// Fallback: Handle old format storage messages
-			if (data.storages || data.storage || (data.type && data.type.includes("storage"))) {
-				console.log(`📨 Storage message received`);
-				updateStorageFromMessage(data);
-			}
 		} catch (error) {
-			console.error("❌ Error processing message:", error);
+			console.error("❌ Error processing FiveM message:", error);
 		}
 	});
+
+	console.log("✓ Runs Calculator initialized");
+	console.log("ℹ️ Listening for real-time FiveM storage updates");
+
+	// Request data from FiveM to start receiving updates
+	try {
+		window.postMessage({ type: "getData" }, "*");
+		console.log("📡 Requested initial data from FiveM");
+	} catch (e) {
+		console.log("Not running in FiveM - use API fetch instead");
+	}
 
 	// Automatic refresh functionality
 	let autoRefreshInterval = null;
