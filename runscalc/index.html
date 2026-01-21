@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<title>Runs Calculator</title>
 	<link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
 	<div id="main">
 		<div class="user-input">
@@ -26,7 +28,8 @@
 						<input type="number" id="userId" placeholder="Enter User ID" />
 						<label for="alternativeApi">Alternative API:</label>
 						<input type="checkbox" id="alternativeApi" />
-						<div style="grid-column: span 2; display: flex; justify-content: space-around; margin-top: 5px;">
+						<div
+							style="grid-column: span 2; display: flex; justify-content: space-around; margin-top: 5px;">
 							<button onclick="saveApiKey()">Save API Key</button>
 							<button onclick="refresh()" title="Uses 3 API charges per refresh">Refresh</button>
 						</div>
@@ -59,12 +62,14 @@
 							<option value="trailerlarge">MK14</option>
 						</select>
 						<label for="postop">Post OP Perk:</label>
-				<input type="checkbox" id="postop" />
-				<label for="premium">Premium:</label>
-				<input type="checkbox" id="premium" />
-				<label for="autoRefresh" title="Automatically refresh storage data every 5 seconds">Auto-Refresh:</label>
-				<input type="checkbox" id="autoRefresh" title="Automatically refresh storage data every 5 seconds" checked />
-			</div>
+						<input type="checkbox" id="postop" />
+						<label for="premium">Premium:</label>
+						<input type="checkbox" id="premium" />
+						<label for="autoRefresh"
+							title="Automatically refresh storage data every 5 seconds">Auto-Refresh:</label>
+						<input type="checkbox" id="autoRefresh"
+							title="Automatically refresh storage data every 5 seconds" checked />
+					</div>
 				</div>
 
 				<!-- Storage Selection Submenu -->
@@ -97,7 +102,8 @@
 							<div class="item-add-container">
 								<div class="item-add-row">
 									<select id="itemType" class="item-dropdown"></select>
-									<input type="number" id="itemAmount" placeholder="Amount" value="0" class="item-amount-input" min="0" />
+									<input type="number" id="itemAmount" placeholder="Amount" value="0"
+										class="item-amount-input" min="0" />
 									<button onclick="addItem()" class="add-item-btn">Add</button>
 								</div>
 							</div>
@@ -111,14 +117,17 @@
 						Results <span class="submenu-toggle">▼</span>
 					</div>
 					<div class="submenu-content">
-						<div style="grid-column: span 2;">Trailer Capacity: <span id="trailer-capacity">0</span> kg</div>
-						<div style="grid-column: span 2; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+						<div style="grid-column: span 2;">Trailer Capacity: <span id="trailer-capacity">0</span> kg
+						</div>
+						<div
+							style="grid-column: span 2; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
 							<strong>Per Item Runs:</strong>
 						</div>
 						<div id="per-item-runs" style="grid-column: span 2;">
 							<!-- Per-item runs will appear here -->
 						</div>
-						<div style="grid-column: span 2; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+						<div
+							style="grid-column: span 2; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
 							<strong>Total Runs Required: <span id="total-runs-required">0</span></strong>
 						</div>
 					</div>
@@ -142,4 +151,5 @@
 	</div>
 	<script src="index.js"></script>
 </body>
+
 </html>

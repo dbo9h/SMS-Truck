@@ -291,7 +291,7 @@ function updateAmountFromStorage() {
 
 function addItem() {
 	const itemType = document.getElementById("itemType").value;
-	let amount = parseInt(document.getElementById("itemAmount").value) || 0;
+	const inputAmount = parseInt(document.getElementById("itemAmount").value) || 0;
 	const sourceStorageId = document.getElementById("sourceStorage").value;
 
 	if (!itemType) {
@@ -299,50 +299,63 @@ function addItem() {
 		return;
 	}
 
-	// Auto-detect from source storage if amount is 0
-	if (amount <= 0) {
-		if (sourceStorageId) {
-			const storage = storages.find(s => s.storage.id === sourceStorageId);
-			if (storage) {
-				const item = storage.items.find(i => i.item && i.item.id === itemType);
-				if (item && item.amount > 0) {
-					amount = item.amount;
-					document.getElementById("itemAmount").value = amount;
-				} else {
-					showError(`No ${ITEM_WEIGHTS[itemType]?.name || 'item'} found in selected storage`);
-					return;
-				}
-			} else {
-				showError("Please enter an amount or select a valid source storage");
-				return;
-			}
-		} else {
-			showError("Please enter an amount or select a source storage");
-			return;
-		}
+	if (!sourceStorageId) {
+		showError("Please select a source storage first");
+		return;
 	}
 
-	// Add or update item
+	// Get current amount from storage automatically
+	const storage = storages.find(s => s.storage.id === sourceStorageId);
+	if (!storage) {
+		showError("Storage not found");
+		return;
+	}
+
+	const item = storage.items.find(i => i.item && i.item.id === itemType);
+	if (!item || item.amount <= 0) {
+		showError(`No ${ITEM_WEIGHTS[itemType]?.name || 'item'} found in selected storage`);
+		return;
+	}
+
+	const currentInStorage = item.amount;
+
+	// Use input amount if provided, otherwise use full storage amount
+	const amountToTrack = inputAmount > 0 ? inputAmount : currentInStorage;
+
+	// Check if item already tracked
 	const existingIndex = selectedItems.findIndex(i => i.itemId === itemType);
 	if (existingIndex !== -1) {
-		selectedItems[existingIndex].amount += amount;
-	} else {
-		selectedItems.push({
-			itemId: itemType,
-			amount: amount
-		});
+		showError(`${ITEM_WEIGHTS[itemType]?.name} is already being tracked`);
+		return;
 	}
 
+	// Add new item - store ORIGINAL storage amount for tracking
+	selectedItems.push({
+		itemId: itemType,
+		amount: amountToTrack, // How much user wants to move
+		originalAmount: currentInStorage // Original amount in storage (for tracking changes)
+	});
+
 	renderSelectedItems();
-	updateAmountFromStorage();
+	document.getElementById("itemAmount").value = 0; // Reset input
 	showError("");
+	console.log(`✓ Tracking ${ITEM_WEIGHTS[itemType]?.name}: ${amountToTrack} to move (${currentInStorage} in storage)`);
 }
 
 function removeItem(index) {
 	selectedItems.splice(index, 1);
 	renderSelectedItems();
-	updateAmountFromStorage();
 	showError("");
+}
+
+function updateSelectedItemAmount(index, newAmount) {
+	const amount = parseInt(newAmount) || 0;
+	if (amount < 0) return;
+
+	selectedItems[index].amount = amount;
+	saveSelectedItems();
+	calculateRuns(); // Recalculate with new amount
+	console.log(`✏️ Updated amount to ${amount}`);
 }
 
 function getRemainingInStorage(itemId) {
@@ -375,19 +388,47 @@ function renderSelectedItems() {
 
 	itemsList.innerHTML = "";
 
+	// Track items to remove (when storage is empty)
+	const itemsToRemove = [];
+
 	selectedItems.forEach((item, index) => {
 		const itemData = ITEM_WEIGHTS[item.itemId];
 		if (!itemData) return;
 
-		const remaining = getRemainingInStorage(item.itemId);
-		const remainingText = remaining !== null ? ` <span style="color: #888;">(${remaining.toLocaleString()} left)</span>` : '';
+		const currentInStorage = getRemainingInStorage(item.itemId);
+		const originalAmount = item.originalAmount || item.amount;
+
+		// Auto-remove if storage is empty (all items moved)
+		if (currentInStorage !== null && currentInStorage === 0) {
+			itemsToRemove.push(index);
+			console.log(`🗑️ Auto-removing ${itemData.name} (storage empty)`);
+			return; // Skip rendering this item
+		}
+
+		// Calculate how many were moved (original - current)
+		const movedAmount = currentInStorage !== null ? (originalAmount - currentInStorage) : 0;
+
+		const storageText = currentInStorage !== null
+			? ` <span style="color: #888; font-size: 0.85em;">(${currentInStorage.toLocaleString()} in storage, ${movedAmount > 0 ? movedAmount.toLocaleString() + ' moved' : 'none moved'})</span>`
+			: '';
 
 		const entry = document.createElement("div");
 		entry.className = "item-entry";
 
 		entry.innerHTML = `
 			<span class="item-name">${itemData.name}</span>
-			<span class="item-amount">${item.amount.toLocaleString()}${remainingText}</span>
+			<div class="item-amount-edit-container">
+				<input 
+					type="number" 
+					class="item-amount-inline-edit" 
+					value="${item.amount}" 
+					min="0"
+					max="${currentInStorage || 999999}"
+					onchange="updateSelectedItemAmount(${index}, this.value)"
+					onclick="this.select()"
+				/>
+				${storageText}
+			</div>
 			<div class="item-controls">
 				<button class="remove-item" onclick="removeItem(${index})" title="Remove item">×</button>
 			</div>
@@ -395,6 +436,18 @@ function renderSelectedItems() {
 
 		itemsList.appendChild(entry);
 	});
+
+	// Remove items with empty storage (in reverse order to maintain indices)
+	for (let i = itemsToRemove.length - 1; i >= 0; i--) {
+		selectedItems.splice(itemsToRemove[i], 1);
+	}
+
+	// If items were removed, save and re-render
+	if (itemsToRemove.length > 0) {
+		saveSelectedItems();
+		renderSelectedItems(); // Re-render without removed items
+		return;
+	}
 
 	saveSelectedItems();
 	// Force immediate recalculation
@@ -462,31 +515,35 @@ function calculateRuns() {
 	// If no items selected, calculate runs for ALL items in storage
 	if (selectedItems.length > 0) {
 		console.log(`📊 Calculating runs for ${selectedItems.length} selected items`);
-		// Calculate runs for selected items - use CURRENT STORAGE amount for runs (updates in real-time)
+		// Calculate runs based on items MOVED (original - current in storage)
 		selectedItems.forEach(item => {
 			const itemData = ITEM_WEIGHTS[item.itemId];
 			if (!itemData) return;
 
-			// Get current amount in source storage (this updates with auto-refresh!)
-			const remaining = getRemainingInStorage(item.itemId);
+			// Get current amount in source storage
+			const currentInStorage = getRemainingInStorage(item.itemId);
+			const originalAmount = item.originalAmount || item.amount;
 
-			// Use CURRENT storage amount for calculation, not the selected amount
-			// This way runs update when storage changes
-			const amountToCalculate = remaining !== null ? remaining : item.amount;
+			// Calculate how many were already moved (original storage - current storage)
+			const alreadyMoved = currentInStorage !== null ? Math.max(0, originalAmount - currentInStorage) : 0;
+
+			// Calculate how much is LEFT to move (user's target - already moved)
+			const leftToMove = Math.max(0, item.amount - alreadyMoved);
+
+			// Calculate runs based on what's LEFT to move
+			const amountToCalculate = leftToMove;
 
 			const weight = amountToCalculate * itemData.weight;
 			const runs = Math.ceil(weight / capacity);
 			totalRuns += runs;
 			totalWeight += weight;
 
-			const remainingText = remaining !== null ? ` <span style="color: #888; font-size: 0.9em;">(${remaining.toLocaleString()} in storage)</span>` : '';
-
 			const runDiv = document.createElement("div");
 			runDiv.className = "per-item-run";
-			runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}${remainingText}`;
+			runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}`;
 			perItemRunsDiv.appendChild(runDiv);
 
-			console.log(`  - ${itemData.name}: ${runs} runs (${amountToCalculate} items in storage)`);
+			console.log(`  - ${itemData.name}: ${runs} runs (${leftToMove} left to move: ${item.amount} target - ${alreadyMoved} moved)`);
 		});
 	} else {
 		console.log(`📊 Calculating runs for ALL items in storage (${storage.items.length} items)`);
@@ -861,7 +918,7 @@ function setupEventListeners() {
 
 	document.getElementById("sourceStorage").addEventListener("change", function () {
 		saveSettings();
-		updateAmountFromStorage();
+
 		// Force recalculation when storage changes
 		renderSelectedItems();
 		calculateRuns();
@@ -874,7 +931,7 @@ function setupEventListeners() {
 	});
 
 	document.getElementById("itemType").addEventListener("change", function () {
-		updateAmountFromStorage();
+
 		renderSelectedItems(); // Re-render to update remaining counts
 		calculateRuns();
 	});
