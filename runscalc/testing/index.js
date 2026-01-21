@@ -115,9 +115,20 @@ function addToConsole(message, type = 'log') {
 	const logEntry = document.createElement('div');
 	logEntry.className = `console-log ${type}`;
 
-	// Format the message
+	// Format the message - handle arrays of arguments
 	let formattedMessage = '';
-	if (typeof message === 'object') {
+	if (Array.isArray(message)) {
+		formattedMessage = message.map(arg => {
+			if (typeof arg === 'object' && arg !== null) {
+				try {
+					return JSON.stringify(arg, null, 2);
+				} catch (e) {
+					return String(arg);
+				}
+			}
+			return String(arg);
+		}).join(' ');
+	} else if (typeof message === 'object' && message !== null) {
 		try {
 			formattedMessage = JSON.stringify(message, null, 2);
 		} catch (e) {
@@ -142,17 +153,17 @@ function addToConsole(message, type = 'log') {
 // Override console methods
 console.log = function (...args) {
 	originalConsoleLog.apply(console, args);
-	addToConsole(args.join(' '), 'info');
+	addToConsole(args, 'info');
 };
 
 console.error = function (...args) {
 	originalConsoleError.apply(console, args);
-	addToConsole(args.join(' '), 'error');
+	addToConsole(args, 'error');
 };
 
 console.warn = function (...args) {
 	originalConsoleWarn.apply(console, args);
-	addToConsole(args.join(' '), 'warn');
+	addToConsole(args, 'warn');
 };
 
 // Real-time storage update handler
@@ -1162,9 +1173,6 @@ document.addEventListener("DOMContentLoaded", function () {
 	window.addEventListener("message", function (event) {
 		if (!event.data) return;
 
-		// Log ALL messages for debugging
-		console.log("📬 FiveM Message:", event.data);
-
 		try {
 			let data = event.data;
 
@@ -1172,7 +1180,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (typeof data === "string") {
 				try {
 					data = JSON.parse(data);
-					console.log("  Parsed JSON:", data);
 				} catch (e) {
 					return;
 				}
@@ -1182,9 +1189,9 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Check for any keys starting with "chest_"
 			for (const key in data) {
 				if (key.startsWith("chest_")) {
-					console.log(`📦 Chest data received: ${key}`, data[key]);
+					console.log(`📦 Chest data received: ${key}`);
+					console.log(JSON.stringify(data[key], null, 2));
 					const chestData = typeof data[key] === "string" ? JSON.parse(data[key]) : data[key];
-					console.log("  Parsed chest data:", chestData);
 					updateStorageFromChest(key, chestData);
 					return;
 				}
@@ -1192,15 +1199,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// Handle inventory data (player's current inventory)
 			if (data.inventory) {
-				console.log(`🎒 Inventory data received:`, data.inventory);
+				console.log(`🎒 Inventory data received`);
 				const inventoryData = typeof data.inventory === "string" ? JSON.parse(data.inventory) : data.inventory;
-				console.log("  Parsed inventory:", inventoryData);
 				updateStorageFromChest("player_inventory", inventoryData);
 				return;
 			}
 
 			// Fallback: Handle old format storage messages
 			if (data.storages || data.storage || (data.type && data.type.includes("storage"))) {
+				console.log(`📨 Storage message received`);
 				updateStorageFromMessage(data);
 			}
 		} catch (error) {
