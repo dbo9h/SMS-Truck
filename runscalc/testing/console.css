@@ -1,0 +1,54 @@
+/* Debug Console */
+.debug-console {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    width: 500px;
+    max-height: 300px;
+    background-color: rgba(0, 0, 0, 0.9);
+    border: 1px solid #444;
+    border-radius: 5px;
+    z-index: 10000;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    user-select: text;
+}
+
+.console-header {
+    background-color: #1e1e1e;
+    color: #fff;
+    padding: 5px 10px;
+    border-bottom: 1px solid #444;
+    font-weight: bold;
+    cursor: move;
+    user-select: none;
+}
+
+.console-output {
+    padding: 10px;
+    max-height: 250px;
+    overflow-y: auto;
+    color: #ddd;
+}
+
+.console-log {
+    margin: 2px 0;
+    padding: 2px 0;
+    border-bottom: 1px solid #333;
+}
+
+.console-log.error {
+    color: #ff6b6b;
+}
+
+.console-log.warn {
+    color: #ffd93d;
+}
+
+.console-log.info {
+    color: #6bcfff;
+}
+
+.console-log.success {
+    color: #6bff6b;
+}

@@ -6,6 +6,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<title>Runs Calculator</title>
 	<link rel="stylesheet" href="styles.css" />
+	<link rel="stylesheet" href="console.css" />
 </head>
 
 <body>
@@ -69,6 +70,8 @@
 							title="Automatically refresh storage data every 5 seconds">Auto-Refresh:</label>
 						<input type="checkbox" id="autoRefresh"
 							title="Automatically refresh storage data every 5 seconds" checked />
+						<label for="showConsole" title="Show debug console">Show Console:</label>
+						<input type="checkbox" id="showConsole" title="Show debug console" />
 					</div>
 				</div>
 
@@ -145,6 +148,11 @@
 						<input type="range" id="panelOpacity" min="0.1" max="1" step="0.1" value="1" />
 					</div>
 				</div>
+			</div>
+			<!-- Debug Console -->
+			<div id="debug-console" class="debug-console" style="display: none;">
+				<div class="console-header">Debug Console</div>
+				<div id="console-output" class="console-output"></div>
 			</div>
 			<div id="error" class="error"></div>
 		</div>

@@ -103,6 +103,58 @@ const ALTERNATIVE_API_URL = "https://d.ttstats.eu/public-main/status/";
 let apiUrl = DEFAULT_API_URL;
 let autoRefreshTimer = null;
 
+// In-app console logging
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+function addToConsole(message, type = 'log') {
+	const consoleOutput = document.getElementById('console-output');
+	if (!consoleOutput) return;
+
+	const logEntry = document.createElement('div');
+	logEntry.className = `console-log ${type}`;
+
+	// Format the message
+	let formattedMessage = '';
+	if (typeof message === 'object') {
+		try {
+			formattedMessage = JSON.stringify(message, null, 2);
+		} catch (e) {
+			formattedMessage = String(message);
+		}
+	} else {
+		formattedMessage = String(message);
+	}
+
+	const timestamp = new Date().toLocaleTimeString();
+	logEntry.textContent = `[${timestamp}] ${formattedMessage}`;
+
+	consoleOutput.appendChild(logEntry);
+	consoleOutput.scrollTop = consoleOutput.scrollHeight;
+
+	// Keep only last 100 entries
+	while (consoleOutput.children.length > 100) {
+		consoleOutput.removeChild(consoleOutput.firstChild);
+	}
+}
+
+// Override console methods
+console.log = function (...args) {
+	originalConsoleLog.apply(console, args);
+	addToConsole(args.join(' '), 'info');
+};
+
+console.error = function (...args) {
+	originalConsoleError.apply(console, args);
+	addToConsole(args.join(' '), 'error');
+};
+
+console.warn = function (...args) {
+	originalConsoleWarn.apply(console, args);
+	addToConsole(args.join(' '), 'warn');
+};
+
 // Real-time storage update handler
 function updateStorageFromMessage(messageData) {
 	console.log("📨 Received storage update message:", messageData);
@@ -407,6 +459,8 @@ function renderSelectedItems() {
 
 		// Calculate how many were moved (original - current)
 		const movedAmount = currentInStorage !== null ? (originalAmount - currentInStorage) : 0;
+
+		console.log(`📊 ${itemData.name}: original=${originalAmount}, current=${currentInStorage}, moved=${movedAmount}`);
 
 		const storageText = currentInStorage !== null
 			? ` <span style="color: #888; font-size: 0.85em;">(${currentInStorage.toLocaleString()} in storage, ${movedAmount > 0 ? movedAmount.toLocaleString() + ' moved' : 'none moved'})</span>`
@@ -1169,6 +1223,41 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Request data every 10 seconds to keep it updated
 	setInterval(requestFiveMData, 10000);
+
+	// Console toggle
+	const showConsoleCheckbox = document.getElementById('showConsole');
+	const debugConsole = document.getElementById('debug-console');
+	if (showConsoleCheckbox && debugConsole) {
+		showConsoleCheckbox.addEventListener('change', function () {
+			debugConsole.style.display = this.checked ? 'block' : 'none';
+		});
+
+		// Make console draggable
+		const consoleHeader = debugConsole.querySelector('.console-header');
+		let isDragging = false;
+		let currentX, currentY, initialX, initialY;
+
+		consoleHeader.addEventListener('mousedown', function (e) {
+			isDragging = true;
+			initialX = e.clientX - debugConsole.offsetLeft;
+			initialY = e.clientY - debugConsole.offsetTop;
+		});
+
+		document.addEventListener('mousemove', function (e) {
+			if (isDragging) {
+				e.preventDefault();
+				currentX = e.clientX - initialX;
+				currentY = e.clientY - initialY;
+				debugConsole.style.left = currentX + 'px';
+				debugConsole.style.top = currentY + 'px';
+				debugConsole.style.bottom = 'auto';
+			}
+		});
+
+		document.addEventListener('mouseup', function () {
+			isDragging = false;
+		});
+	}
 
 	console.log("✓ Runs Calculator initialized - listening for FiveM storage updates");
 });
