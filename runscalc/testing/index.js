@@ -687,34 +687,52 @@ function updateStorageFromChest(chestId, chestData) {
 	const userId = localStorage.getItem("userId");
 	if (!userId) return;
 
-	// The chest data is the inventory JSON
-	// We need to find which storage this chest belongs to and update it
-	// For now, we'll update all storages with matching items
-
 	if (!chestData || typeof chestData !== "object") {
 		console.warn("Invalid chest data");
 		return;
 	}
 
-	// Update storages array with new chest data
-	// This updates the items in the storage without making API calls
+	// Chest data is inventory format: {itemName: amount, ...}
+	// We need to update our storages with this data
+	let updated = false;
+
 	storages.forEach(storage => {
 		if (storage && storage.items) {
-			// Update item amounts from chest data
 			storage.items.forEach(storageItem => {
-				if (storageItem.item && chestData[storageItem.item.id] !== undefined) {
-					const newAmount = chestData[storageItem.item.id];
-					console.log(`  Updating ${storageItem.item.name}: ${storageItem.amount} → ${newAmount}`);
-					storageItem.amount = newAmount;
+				if (!storageItem.item) return;
+
+				// Try to find matching item in chest data by name
+				const itemName = storageItem.item.name;
+				const itemId = storageItem.item.id;
+
+				// Check both name and id
+				if (chestData[itemName] !== undefined) {
+					const newAmount = parseInt(chestData[itemName]) || 0;
+					if (storageItem.amount !== newAmount) {
+						console.log(`  ✓ ${itemName}: ${storageItem.amount} → ${newAmount}`);
+						storageItem.amount = newAmount;
+						updated = true;
+					}
+				} else if (chestData[itemId] !== undefined) {
+					const newAmount = parseInt(chestData[itemId]) || 0;
+					if (storageItem.amount !== newAmount) {
+						console.log(`  ✓ ${itemName}: ${storageItem.amount} → ${newAmount}`);
+						storageItem.amount = newAmount;
+						updated = true;
+					}
 				}
 			});
 		}
 	});
 
-	// Refresh UI with updated data
-	renderSelectedItems();
-	calculateRuns();
-	console.log("✓ Storage updated from FiveM (no API charge!)");
+	if (updated) {
+		// Refresh UI with updated data
+		renderSelectedItems();
+		calculateRuns();
+		console.log("✅ Storage updated from FiveM (no API charge!)");
+	} else {
+		console.log("⚠️ No matching items found in chest data");
+	}
 }
 
 // Silent refresh for auto-polling (doesn't show errors)
@@ -1090,6 +1108,9 @@ document.addEventListener("DOMContentLoaded", function () {
 	window.addEventListener("message", function (event) {
 		if (!event.data) return;
 
+		// Log ALL messages for debugging
+		console.log("📬 FiveM Message:", event.data);
+
 		try {
 			let data = event.data;
 
@@ -1097,6 +1118,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (typeof data === "string") {
 				try {
 					data = JSON.parse(data);
+					console.log("  Parsed JSON:", data);
 				} catch (e) {
 					return;
 				}
@@ -1106,8 +1128,9 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Check for any keys starting with "chest_"
 			for (const key in data) {
 				if (key.startsWith("chest_")) {
-					console.log(`📦 Chest data received: ${key}`);
+					console.log(`📦 Chest data received: ${key}`, data[key]);
 					const chestData = typeof data[key] === "string" ? JSON.parse(data[key]) : data[key];
+					console.log("  Parsed chest data:", chestData);
 					updateStorageFromChest(key, chestData);
 					return;
 				}
