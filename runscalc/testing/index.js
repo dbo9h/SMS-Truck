@@ -943,6 +943,12 @@ function updateStorageFromChest(chestId, chestData) {
 
 // Silent refresh for auto-polling (ALWAYS fetches fresh data)
 async function silentRefreshStorages() {
+	// If running in game, skip API calls - use runtime cache instead
+	if (runningInGame) {
+		console.log("⏭️ Skipping API call - using FiveM runtime data (0 charges)");
+		return;
+	}
+
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
 
