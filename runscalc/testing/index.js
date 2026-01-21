@@ -1233,44 +1233,64 @@ document.addEventListener("DOMContentLoaded", function () {
 		calculateRuns();
 	}
 
-	// Listen for real-time storage updates from FiveM game client
+	// Listen for ALL FiveM messages and update storage data in real-time
 	window.addEventListener("message", function (event) {
-		if (!event.data) return;
+		if (!event.data || typeof event.data !== 'object') return;
 
-		try {
-			let data = event.data;
+		const data = event.data;
+		let storageUpdated = false;
 
-			// Parse JSON if string
-			if (typeof data === "string") {
+		// FiveM sends data as flat key-value pairs
+		// Look for chest_ keys which contain storage inventory
+		for (const key in data) {
+			if (key.startsWith("chest_")) {
 				try {
-					data = JSON.parse(data);
+					// Parse the chest data
+					let chestInventory = data[key];
+					if (typeof chestInventory === 'string') {
+						chestInventory = JSON.parse(chestInventory);
+					}
+
+					// Update our storage data with this chest's inventory
+					if (chestInventory && typeof chestInventory === 'object') {
+						// Find matching storage and update item amounts
+						storages.forEach(storage => {
+							if (storage && storage.items) {
+								storage.items.forEach(storageItem => {
+									if (storageItem.item) {
+										const itemName = storageItem.item.name;
+										const itemId = storageItem.item.id;
+
+										// Check if this item is in the chest data
+										if (chestInventory[itemName] !== undefined) {
+											const newAmount = parseInt(chestInventory[itemName]) || 0;
+											if (storageItem.amount !== newAmount) {
+												storageItem.amount = newAmount;
+												storageUpdated = true;
+											}
+										} else if (chestInventory[itemId] !== undefined) {
+											const newAmount = parseInt(chestInventory[itemId]) || 0;
+											if (storageItem.amount !== newAmount) {
+												storageItem.amount = newAmount;
+												storageUpdated = true;
+											}
+										}
+									}
+								});
+							}
+						});
+					}
 				} catch (e) {
-					return;
+					// Ignore parse errors
 				}
 			}
+		}
 
-			// FiveM sends data as key-value pairs
-			// Look for ANY chest_ keys (storage data)
-			let foundStorageData = false;
-
-			for (const key in data) {
-				// Handle chest data (chest_[id] contains storage inventory)
-				if (key.startsWith("chest_")) {
-					console.log(`📦 Storage update: ${key}`);
-					const chestData = typeof data[key] === "string" ? JSON.parse(data[key]) : data[key];
-					updateStorageFromChest(key, chestData);
-					foundStorageData = true;
-				}
-			}
-
-			// If we got storage data, update the UI
-			if (foundStorageData) {
-				renderSelectedItems();
-				calculateRuns();
-			}
-
-		} catch (error) {
-			console.error("❌ Error processing FiveM message:", error);
+		// If storage was updated, refresh the UI
+		if (storageUpdated) {
+			renderSelectedItems();
+			calculateRuns();
+			console.log("✅ Storage updated from FiveM (no API charge)");
 		}
 	});
 
