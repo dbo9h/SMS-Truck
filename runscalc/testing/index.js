@@ -218,6 +218,14 @@ function applyRuntimeCacheToStorages() {
 
 	if (updated) {
 		populateStorageDropdowns();
+
+		// Auto-select a source storage if none is chosen yet (keeps UI from resetting to defaults)
+		const sourceSelect = document.getElementById("sourceStorage");
+		if (sourceSelect && !sourceSelect.value && storages.length > 0) {
+			sourceSelect.value = storages[0].storage.id;
+			saveSettings();
+		}
+
 		renderSelectedItems();
 		calculateRuns();
 		console.log("✅ Runtime storage update applied (0 API charges)");
