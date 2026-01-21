@@ -1215,21 +1215,50 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	});
 
-	// Request initial data from FiveM
-	function requestFiveMData() {
-		try {
-			window.postMessage({ type: "getData" }, "*");
-			console.log("📡 Requested data from FiveM");
-		} catch (e) {
-			console.log("Not running in FiveM");
+	// Automatic refresh functionality
+	let autoRefreshInterval = null;
+
+	function startAutoRefresh() {
+		if (autoRefreshInterval) return; // Already running
+
+		console.log("🔄 Auto-refresh enabled - polling API every 30 seconds");
+
+		// Refresh immediately
+		silentRefreshStorages();
+
+		// Then refresh every 30 seconds
+		autoRefreshInterval = setInterval(() => {
+			silentRefreshStorages();
+		}, 30000); // 30 seconds
+	}
+
+	function stopAutoRefresh() {
+		if (autoRefreshInterval) {
+			clearInterval(autoRefreshInterval);
+			autoRefreshInterval = null;
+			console.log("⏸️ Auto-refresh disabled");
 		}
 	}
 
-	// Request data on load
-	requestFiveMData();
+	// Auto-refresh toggle handler
+	const autoRefreshCheckbox = document.getElementById('autoRefresh');
+	if (autoRefreshCheckbox) {
+		autoRefreshCheckbox.addEventListener('change', function () {
+			if (this.checked) {
+				startAutoRefresh();
+			} else {
+				stopAutoRefresh();
+			}
+		});
 
-	// Request data every 10 seconds to keep it updated
-	setInterval(requestFiveMData, 10000);
+		// Start if checked by default
+		if (autoRefreshCheckbox.checked) {
+			startAutoRefresh();
+		}
+	}
+
+	console.log("✓ Runs Calculator initialized");
+	console.log("ℹ️ Storage data comes from API - click 'Fetch Storages' to update");
 
 	// Console toggle
 	const showConsoleCheckbox = document.getElementById('showConsole');
