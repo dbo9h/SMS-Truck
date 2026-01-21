@@ -1136,6 +1136,15 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			}
 
+			// Handle inventory data (player's current inventory)
+			if (data.inventory) {
+				console.log(`🎒 Inventory data received:`, data.inventory);
+				const inventoryData = typeof data.inventory === "string" ? JSON.parse(data.inventory) : data.inventory;
+				console.log("  Parsed inventory:", inventoryData);
+				updateStorageFromChest("player_inventory", inventoryData);
+				return;
+			}
+
 			// Fallback: Handle old format storage messages
 			if (data.storages || data.storage || (data.type && data.type.includes("storage"))) {
 				updateStorageFromMessage(data);
