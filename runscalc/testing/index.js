@@ -106,6 +106,8 @@ let autoRefreshTimer = null;
 // Runtime cache system (like Dogg)
 let runningInGame = false; // Detected when we get fromTycoonScript message
 let runtimeCache = {}; // Mutable runtime storage data (chest_*, inventory, backpack)
+let runtimeUserId = null;
+let runtimeFactionId = null;
 let storagesUpdatedSinceLastRefresh = false;
 let pendingRefresh = false;
 let refreshTimeout = null;
@@ -124,6 +126,15 @@ window.addEventListener("message", ({ data }) => {
 	// Dogg stores payload in e.data; mirror that here
 	const payload = data.data && typeof data.data === "object" ? data.data : data;
 	if (!payload || typeof payload !== "object") return;
+
+	// Extract user/faction from runtime payload when available (like Dogg uses pkey + faction)
+	if (payload.pkey && !runtimeUserId) {
+		const parts = String(payload.pkey).split("_");
+		if (parts[0]) runtimeUserId = parts[0];
+	}
+	if (payload.faction != null && runtimeFactionId == null) {
+		runtimeFactionId = String(payload.faction);
+	}
 
 	// Update runtime cache with storage-related keys (chest_*, inventory, backpack)
 	for (const [key, value] of Object.entries(payload)) {
@@ -169,41 +180,84 @@ function applyRuntimeCacheToStorages() {
 
 	let updated = false;
 
-	storages.forEach(storage => {
-		if (!storage || !storage.items) return;
+	// Update storages ONLY from the matching chest key (prevents cross-storage corruption like the “524” bug)
+	for (const chestKey in runtimeCache) {
+		const chestData = runtimeCache[chestKey];
+		if (!chestData || typeof chestData !== "object") continue;
 
-		storage.items.forEach(storageItem => {
-			if (!storageItem.item) return;
+		const storageId = getStorageIdFromChestKey(chestKey, runtimeUserId, runtimeFactionId);
+		if (!storageId) continue;
 
-			const itemName = storageItem.item.name;
-			const itemId = storageItem.item.id;
+		const storageMeta = getStorageById(storageId) || {
+			name: storageId,
+			id: storageId,
+			type: "storage"
+		};
 
-			for (const chestKey in runtimeCache) {
-				const chestData = runtimeCache[chestKey];
-				if (!chestData || typeof chestData !== "object") continue;
+		const parsedItems = Object.entries(chestData)
+			.map(([rawItemId, itemData]) => {
+				const amount = typeof itemData === "object" && itemData !== null ? itemData.amount : itemData;
+				const cleanItemId = String(rawItemId).replace(/(<.+?>)|(&#.+?;)/g, "");
+				const item = ITEM_WEIGHTS[cleanItemId];
+				if (!item) return null;
+				return {
+					item: { id: cleanItemId, name: item.name, weight: item.weight },
+					amount: parseInt(amount) || 0
+				};
+			})
+			.filter(i => i && i.amount > 0);
 
-				if (chestData[itemName] !== undefined) {
-					const newAmount = parseInt(chestData[itemName]) || 0;
-					if (storageItem.amount !== newAmount) {
-						storageItem.amount = newAmount;
-						updated = true;
-					}
-				} else if (chestData[itemId] !== undefined) {
-					const newAmount = parseInt(chestData[itemId]) || 0;
-					if (storageItem.amount !== newAmount) {
-						storageItem.amount = newAmount;
-						updated = true;
-					}
-				}
-			}
-		});
-	});
+		const existingIndex = storages.findIndex(s => s && s.storage && s.storage.id === storageMeta.id);
+		if (existingIndex >= 0) {
+			storages[existingIndex] = { storage: storageMeta, items: parsedItems };
+		} else {
+			storages.push({ storage: storageMeta, items: parsedItems });
+		}
+		updated = true;
+	}
 
 	if (updated) {
+		populateStorageDropdowns();
 		renderSelectedItems();
 		calculateRuns();
 		console.log("✅ Runtime storage update applied (0 API charges)");
 	}
+}
+
+function getStorageIdFromChestKey(chestKey, userIdParam, factionIdParam) {
+	if (!chestKey) return null;
+	let key = String(chestKey);
+	if (key.startsWith("chest_")) key = key.slice("chest_".length);
+
+	// chest_u{userId}*
+	if (key.startsWith("u")) {
+		// key like: u123_biz_train / u123_biz_train_chest / etc
+		key = key.replace(/^u\d+/, "");
+		key = key.replace(/^_/, "");
+	}
+
+	// chest_self_storage:{userId}:{id}:chest
+	// (sometimes comes without chest_ prefix)
+	const selfMatch = key.match(/^self_storage:(\d+):(.+):chest$/);
+	if (selfMatch) {
+		key = selfMatch[2] || "";
+	}
+
+	// Some servers may send raw chest_u123_* without chest_ prefix
+	key = key.replace(/^chest_u\d+/, "").replace(/^_/, "");
+	key = key.replace(/^chest_self_storage:\d+:(.+):chest$/, "$1").replace(/^_/, "");
+
+	// Vehicle storages: veh_*_{id}
+	const vehicleMatch = key.match(/^veh_\w+_(.+)$/);
+	if (vehicleMatch) key = vehicleMatch[1];
+
+	// Faction storages: faq_{factionId} -> faction
+	if (key.startsWith("faq_")) {
+		if (factionIdParam && key === `faq_${factionIdParam}`) return "faction";
+		return key; // keep as faq_### so it can still be selected
+	}
+
+	return key || null;
 }
 
 // In-app console logging
@@ -796,51 +850,21 @@ async function fetchStorages() {
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
 
-	if (!apiKey || !userId) {
-		showError("Please enter API Key and User ID");
+	// If we're running in FiveM, do NOT fetch storages from API (0 charges, runtime-only)
+	if (runningInGame) {
+		console.log("⏭️ In FiveM: skipping API storages fetch (runtime-only, 0 charges)");
 		return;
 	}
 
-	// Check if we have cached data
-	const cacheKey = `storages_${userId}`;
-	const cachedData = localStorage.getItem(cacheKey);
-	const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
-
-	// Use cached data if it exists and is less than 5 minutes old
-	const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-	if (cachedData && cacheTimestamp) {
-		const age = Date.now() - parseInt(cacheTimestamp);
-		if (age < CACHE_DURATION) {
-			console.log("📦 Using cached storage data (no API charge!)");
-			try {
-				const storageList = JSON.parse(cachedData);
-				storages = storageList.map(storage => {
-					const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
-					if (!parsed) console.warn(`❌ Failed to parse storage: ${storage.name}`);
-					return parsed;
-				}).filter(s => s !== null);
-
-				console.log("✓ Successfully loaded", storages.length, "storages from cache");
-				populateStorageDropdowns();
-				renderSelectedItems();
-				calculateRuns();
-				showError("");
-				return;
-			} catch (e) {
-				console.warn("Failed to load cache, fetching from API");
-			}
-		}
+	if (!apiKey || !userId) {
+		showError("Please enter API Key and User ID");
+		return;
 	}
 
 	try {
 		console.log("🌐 Fetching from API (1 API charge)");
 		const data = await apiFetch(`storages/${userId}`, apiKey);
 		const storageList = data.storages || [];
-
-		// Cache the data
-		localStorage.setItem(cacheKey, JSON.stringify(storageList));
-		localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
-		console.log("💾 Cached storage data for 5 minutes");
 
 		console.log("📦 API returned", storageList.length, "storage names:", storageList.map(s => s.name));
 
@@ -1324,107 +1348,4 @@ document.addEventListener("DOMContentLoaded", function () {
 			isDragging = false;
 		});
 	}
-	// PASTE THIS CODE AT LINE 1380 in index.js (before the final console.log)
-
-	// Debounced refresh function - applies runtime cache to storages
-	function scheduleRuntimeRefresh() {
-		if (pendingRefresh) return;
-
-		pendingRefresh = true;
-
-		if (refreshTimeout) {
-			clearTimeout(refreshTimeout);
-		}
-
-		refreshTimeout = setTimeout(() => {
-			applyRuntimeCacheToStorages();
-			pendingRefresh = false;
-			storagesUpdatedSinceLastRefresh = false;
-		}, REFRESH_IMMEDIATE_DELAY);
-	}
-
-	// Apply runtime cache to storage items
-	function applyRuntimeCacheToStorages() {
-		if (!runningInGame || Object.keys(runtimeCache).length === 0) return;
-
-		let updated = false;
-
-		storages.forEach(storage => {
-			if (storage && storage.items) {
-				storage.items.forEach(storageItem => {
-					if (storageItem.item) {
-						const itemName = storageItem.item.name;
-						const itemId = storageItem.item.id;
-
-						// Check all cached chests for this item
-						for (const chestKey in runtimeCache) {
-							const chestData = runtimeCache[chestKey];
-
-							if (chestData[itemName] !== undefined) {
-								const newAmount = parseInt(chestData[itemName]) || 0;
-								if (storageItem.amount !== newAmount) {
-									storageItem.amount = newAmount;
-									updated = true;
-								}
-							} else if (chestData[itemId] !== undefined) {
-								const newAmount = parseInt(chestData[itemId]) || 0;
-								if (storageItem.amount !== newAmount) {
-									storageItem.amount = newAmount;
-									updated = true;
-								}
-							}
-						}
-					}
-				});
-			}
-		});
-
-		if (updated) {
-			renderSelectedItems();
-			calculateRuns();
-			console.log("✅ Runtime update applied (0 API charges)");
-		}
-	}
-
-	// Listen for FiveM messages and update runtime cache
-	window.addEventListener("message", function (event) {
-		if (!event.data || typeof event.data !== 'object') return;
-
-		const data = event.data;
-
-		// FiveM sends storage data as chest_[id] keys
-		for (const key in data) {
-			if (key.startsWith("chest_")) {
-				try {
-					let chestInventory = data[key];
-					if (typeof chestInventory === 'string') {
-						chestInventory = JSON.parse(chestInventory);
-					}
-
-					// Update runtime cache
-					if (chestInventory && typeof chestInventory === 'object') {
-						runtimeCache[key] = chestInventory;
-						storagesUpdatedSinceLastRefresh = true;
-
-						// Schedule debounced refresh
-						scheduleRuntimeRefresh();
-					}
-				} catch (e) {
-					// Ignore parse errors
-				}
-			}
-		}
-	});
-
-	// Request data from FiveM to start receiving updates
-	try {
-		window.postMessage({ type: "getData" }, "*");
-		console.log("📡 Requested runtime data from FiveM");
-	} catch (e) {
-		runningInGame = false;
-		console.log("Not running in FiveM - use manual refresh");
-	}
-
-
-	console.log("✓ Runs Calculator initialized - listening for FiveM storage updates");
 });
