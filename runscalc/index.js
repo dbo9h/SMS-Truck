@@ -197,11 +197,13 @@ function calculateCapacity() {
 	
 	let capacity = 0;
 	
-	// Determine which trailer to use
+	// MK15 is a cab that can be used WITH a trailer (both capacities add together)
 	if (mk15Checked) {
-		capacity = TRAILER_CAPACITIES.mk15.capacity;
-	} else if (trailerSelect && TRAILER_CAPACITIES[trailerSelect]) {
-		capacity = TRAILER_CAPACITIES[trailerSelect].capacity;
+		capacity += TRAILER_CAPACITIES.mk15.capacity;
+	}
+	
+	if (trailerSelect && TRAILER_CAPACITIES[trailerSelect]) {
+		capacity += TRAILER_CAPACITIES[trailerSelect].capacity;
 	}
 	
 	// Apply multipliers (same as Dogg folder: 1 + premium*0.15 + postop*0.15)
@@ -558,26 +560,55 @@ function showError(message) {
 	document.getElementById("error").textContent = message;
 }
 
+function saveSettings() {
+	localStorage.setItem("mk15", document.getElementById("mk15").checked ? "true" : "false");
+	localStorage.setItem("trailer", document.getElementById("trailer").value);
+	localStorage.setItem("postop", document.getElementById("postop").checked ? "true" : "false");
+	localStorage.setItem("premium", document.getElementById("premium").checked ? "true" : "false");
+	localStorage.setItem("sourceStorage", document.getElementById("sourceStorage").value);
+	localStorage.setItem("destinationStorage", document.getElementById("destinationStorage").value);
+}
+
+function loadSettings() {
+	const savedMk15 = localStorage.getItem("mk15") === "true";
+	const savedTrailer = localStorage.getItem("trailer") || "";
+	const savedPostop = localStorage.getItem("postop") === "true";
+	const savedPremium = localStorage.getItem("premium") === "true";
+	const savedSourceStorage = localStorage.getItem("sourceStorage") || "";
+	const savedDestinationStorage = localStorage.getItem("destinationStorage") || "";
+	
+	document.getElementById("mk15").checked = savedMk15;
+	document.getElementById("trailer").value = savedTrailer;
+	document.getElementById("postop").checked = savedPostop;
+	document.getElementById("premium").checked = savedPremium;
+	document.getElementById("sourceStorage").value = savedSourceStorage;
+	document.getElementById("destinationStorage").value = savedDestinationStorage;
+}
+
 function setupEventListeners() {
 	// Calculate on input changes
 	document.getElementById("mk15").addEventListener("change", function() {
-		if (this.checked) {
-			document.getElementById("trailer").value = "";
-		}
+		saveSettings();
 		calculateRuns();
 	});
 	
 	document.getElementById("trailer").addEventListener("change", function() {
-		if (this.value) {
-			document.getElementById("mk15").checked = false;
-		}
+		saveSettings();
 		calculateRuns();
 	});
 	
-	document.getElementById("postop").addEventListener("change", calculateRuns);
-	document.getElementById("premium").addEventListener("change", calculateRuns);
+	document.getElementById("postop").addEventListener("change", function() {
+		saveSettings();
+		calculateRuns();
+	});
+	
+	document.getElementById("premium").addEventListener("change", function() {
+		saveSettings();
+		calculateRuns();
+	});
 	
 	document.getElementById("sourceStorage").addEventListener("change", function() {
+		saveSettings();
 		// Auto-fill amount when storage is selected and item is selected
 		const itemType = document.getElementById("itemType").value;
 		if (itemType && this.value) {
@@ -590,6 +621,11 @@ function setupEventListeners() {
 			}
 		}
 	});
+	
+	document.getElementById("destinationStorage").addEventListener("change", function() {
+		saveSettings();
+	});
+	
 	document.getElementById("itemType").addEventListener("change", function() {
 		// Auto-fill amount when item is selected and storage is selected
 		const sourceStorageId = document.getElementById("sourceStorage").value;
@@ -668,6 +704,9 @@ document.addEventListener("DOMContentLoaded", function() {
 	initDragging();
 	loadSelectedItems();
 	
+	// Load settings after everything is set up
+	loadSettings();
+	
 	// Panel opacity listener
 	document.getElementById("panelOpacity").addEventListener("input", function() {
 		const userInput = document.getElementById("main").querySelector(".user-input");
@@ -678,10 +717,18 @@ document.addEventListener("DOMContentLoaded", function() {
 	
 	// Load storages if API key exists
 	if (savedApiKey && savedUserId) {
-		fetchStorages();
+		fetchStorages().then(() => {
+			// Reload settings after storages are loaded to restore storage selections
+			loadSettings();
+			calculateRuns();
+		}).catch(() => {
+			populateStorageDropdowns();
+			loadSettings();
+			calculateRuns();
+		});
 	} else {
 		populateStorageDropdowns();
+		loadSettings();
+		calculateRuns();
 	}
-	
-	calculateRuns();
 });
