@@ -1218,18 +1218,26 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Automatic refresh functionality
 	let autoRefreshInterval = null;
 
-	function startAutoRefresh() {
-		if (autoRefreshInterval) return; // Already running
+	function getRefreshInterval() {
+		const intervalSelect = document.getElementById('refreshInterval');
+		return intervalSelect ? parseInt(intervalSelect.value) : 30000;
+	}
 
-		console.log("🔄 Auto-refresh enabled - polling API every 30 seconds");
+	function startAutoRefresh() {
+		if (autoRefreshInterval) {
+			clearInterval(autoRefreshInterval);
+		}
+
+		const interval = getRefreshInterval();
+		console.log(`🔄 Auto-refresh enabled - polling API every ${interval / 1000} seconds`);
 
 		// Refresh immediately
 		silentRefreshStorages();
 
-		// Then refresh every 30 seconds
+		// Then refresh at selected interval
 		autoRefreshInterval = setInterval(() => {
 			silentRefreshStorages();
-		}, 30000); // 30 seconds
+		}, interval);
 	}
 
 	function stopAutoRefresh() {
@@ -1242,6 +1250,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Auto-refresh toggle handler
 	const autoRefreshCheckbox = document.getElementById('autoRefresh');
+	const refreshIntervalSelect = document.getElementById('refreshInterval');
+
 	if (autoRefreshCheckbox) {
 		autoRefreshCheckbox.addEventListener('change', function () {
 			if (this.checked) {
@@ -1255,6 +1265,15 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (autoRefreshCheckbox.checked) {
 			startAutoRefresh();
 		}
+	}
+
+	// Restart auto-refresh when interval changes
+	if (refreshIntervalSelect) {
+		refreshIntervalSelect.addEventListener('change', function () {
+			if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
+				startAutoRefresh(); // Restart with new interval
+			}
+		});
 	}
 
 	console.log("✓ Runs Calculator initialized");
