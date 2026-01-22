@@ -30,20 +30,13 @@ body {
 
 #protectionCanvas {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    /* 
-     * Transparent canvas background
-     * The canvas will render subtle noise/pixels to prevent burn-in
-     * without blocking the game view
-     */
+    /* Position and size set dynamically by JavaScript */
     background: transparent;
     /* Ensure canvas doesn't interfere with game input */
     pointer-events: none;
     /* Prevent any visual artifacts */
     image-rendering: pixelated;
+    z-index: 1;
 }
 
 /* Control Panel Styles */

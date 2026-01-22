@@ -120,12 +120,16 @@ function saveSettings() {
  * Update canvas position and size based on CONFIG
  */
 function updateCanvasSize() {
-    canvas.style.left = CONFIG.posX + 'px';
-    canvas.style.top = CONFIG.posY + 'px';
-    canvas.style.width = CONFIG.width + 'px';
-    canvas.style.height = CONFIG.height + 'px';
-    canvas.width = CONFIG.width;
-    canvas.height = CONFIG.height;
+    // Ensure minimum dimensions
+    const width = Math.max(CONFIG.width || 100, 100);
+    const height = Math.max(CONFIG.height || 100, 100);
+    
+    canvas.style.left = (CONFIG.posX || 0) + 'px';
+    canvas.style.top = (CONFIG.posY || 0) + 'px';
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    canvas.width = width;
+    canvas.height = height;
     generateParticles();
 }
 
@@ -197,6 +201,10 @@ function animate() {
     offsetY += CONFIG.driftSpeed * 0.2;
 
     // Render each noise particle
+    if (particles.length === 0 && canvas.width > 0 && canvas.height > 0) {
+        generateParticles();
+    }
+    
     particles.forEach(particle => {
         // Apply global drift offset to particle position
         const x = particle.x + offsetX;
@@ -247,6 +255,7 @@ function animate() {
  */
 function initUI() {
     const panel = document.getElementById('controlPanel');
+    const toggleBtn = document.getElementById('togglePanel');
     const enableCheckbox = document.getElementById('enableAnimation');
     const posXSlider = document.getElementById('posX');
     const posYSlider = document.getElementById('posY');
@@ -264,6 +273,7 @@ function initUI() {
         panel.classList.toggle('active');
     };
     
+    toggleBtn.addEventListener('click', togglePanel);
 
     // Close panel
     document.getElementById('closePanel').addEventListener('click', () => {
@@ -438,10 +448,31 @@ function initUI() {
 
 // Initialize canvas on page load
 window.addEventListener('load', () => {
+    // Ensure window dimensions are available
+    if (!CONFIG.width || CONFIG.width === 0) {
+        CONFIG.width = window.innerWidth || 1920;
+    }
+    if (!CONFIG.height || CONFIG.height === 0) {
+        CONFIG.height = window.innerHeight || 1080;
+    }
+    
     loadSettings();
+    
+    // Ensure dimensions after loading settings
+    if (!CONFIG.width || CONFIG.width === 0) {
+        CONFIG.width = window.innerWidth || 1920;
+    }
+    if (!CONFIG.height || CONFIG.height === 0) {
+        CONFIG.height = window.innerHeight || 1080;
+    }
+    
     updateCanvasSize();
     initUI();
-    animate();
+    
+    // Start animation after a short delay to ensure canvas is ready
+    setTimeout(() => {
+        animate();
+    }, 100);
 });
 
 // Handle window resize for responsive behavior
