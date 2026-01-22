@@ -15,6 +15,69 @@
         by displaying a subtle, moving pattern that shifts pixels over time.
     -->
     <canvas id="protectionCanvas"></canvas>
+    
+    <!-- Control Panel UI -->
+    <div id="controlPanel" class="control-panel">
+        <div class="panel-header">
+            <h3>OLED Protection Settings</h3>
+            <button id="closePanel" class="close-btn">×</button>
+        </div>
+        
+        <div class="panel-content">
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="enableAnimation" checked>
+                    Enable Animation
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>Position X: <span id="posXValue">0</span>px</label>
+                <input type="range" id="posX" min="0" max="1920" value="0" step="1">
+            </div>
+            
+            <div class="control-group">
+                <label>Position Y: <span id="posYValue">0</span>px</label>
+                <input type="range" id="posY" min="0" max="1080" value="0" step="1">
+            </div>
+            
+            <div class="control-group">
+                <label>Width: <span id="widthValue">1920</span>px</label>
+                <input type="range" id="width" min="50" max="1920" value="1920" step="10">
+            </div>
+            
+            <div class="control-group">
+                <label>Height: <span id="heightValue">1080</span>px</label>
+                <input type="range" id="height" min="50" max="1080" value="1080" step="10">
+            </div>
+            
+            <div class="control-group">
+                <label>Opacity: <span id="opacityValue">2</span>%</label>
+                <input type="range" id="opacity" min="0" max="10" value="2" step="0.1">
+            </div>
+            
+            <div class="control-group">
+                <label>Particle Count: <span id="particleValue">150</span></label>
+                <input type="range" id="particles" min="10" max="500" value="150" step="10">
+            </div>
+            
+            <div class="control-group">
+                <label>Speed: <span id="speedValue">0.05</span></label>
+                <input type="range" id="speed" min="0" max="0.2" value="0.05" step="0.01">
+            </div>
+            
+            <div class="control-group">
+                <button id="presetPassive" class="preset-btn">Passive Mode Location</button>
+                <button id="presetFullscreen" class="preset-btn">Fullscreen</button>
+            </div>
+            
+            <div class="control-group">
+                <button id="resetSettings" class="reset-btn">Reset to Default</button>
+            </div>
+        </div>
+    </div>
+    
+    
     <script src="script.js"></script>
 </body>
 

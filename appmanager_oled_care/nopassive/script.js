@@ -18,29 +18,48 @@
 // CONFIGURATION
 // ============================================================================
 
-// Toggle to enable/disable the burn-in protection animation
-const ANIMATION_ENABLED = true;
-
-// Animation settings (adjust for performance/visibility balance)
-const CONFIG = {
-    // Opacity of noise pixels (0.01 = 1%, very subtle)
+// Default settings
+const DEFAULT_CONFIG = {
+    enabled: true,
+    posX: 0,
+    posY: 0,
+    width: 1920,
+    height: 1080,
     noiseOpacity: 0.02,
-
-    // Number of noise pixels to render per frame (lower = better performance)
     noiseParticles: 150,
+    driftSpeed: 0.05,
+};
 
-    // Size range of noise pixels in pixels
+// Animation settings (loaded from localStorage or defaults)
+let CONFIG = {
+    enabled: true,
+    posX: 0,
+    posY: 0,
+    width: window.innerWidth || 1920,
+    height: window.innerHeight || 1080,
+    noiseOpacity: 0.02,
+    noiseParticles: 150,
+    driftSpeed: 0.05,
     particleMinSize: 1,
     particleMaxSize: 3,
-
-    // Movement speed (pixels per frame)
-    driftSpeed: 0.05,
-
-    // How often to regenerate noise pattern (frames)
-    regenerateInterval: 180, // ~3 seconds at 60fps
-
-    // Color of noise (grayscale, near-black for OLED safety)
+    regenerateInterval: 180,
     noiseColor: 'rgba(20, 20, 20, ',
+};
+
+// Preset locations (common FiveM UI positions)
+const PRESETS = {
+    passiveMode: {
+        posX: 50,
+        posY: 50,
+        width: 300,
+        height: 100,
+    },
+    fullscreen: {
+        posX: 0,
+        posY: 0,
+        width: window.innerWidth || 1920,
+        height: window.innerHeight || 1080,
+    }
 };
 
 // ============================================================================
@@ -60,19 +79,70 @@ let offsetX = 0;
 let offsetY = 0;
 
 // ============================================================================
+// SETTINGS MANAGEMENT
+// ============================================================================
+
+/**
+ * Load settings from localStorage
+ */
+function loadSettings() {
+    const saved = localStorage.getItem('oledProtectionSettings');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            CONFIG = { ...CONFIG, ...parsed };
+            // Update canvas size from saved config
+            updateCanvasSize();
+        } catch (e) {
+            console.warn('Failed to load settings:', e);
+        }
+    }
+}
+
+/**
+ * Save settings to localStorage
+ */
+function saveSettings() {
+    const toSave = {
+        enabled: CONFIG.enabled,
+        posX: CONFIG.posX,
+        posY: CONFIG.posY,
+        width: CONFIG.width,
+        height: CONFIG.height,
+        noiseOpacity: CONFIG.noiseOpacity,
+        noiseParticles: CONFIG.noiseParticles,
+        driftSpeed: CONFIG.driftSpeed,
+    };
+    localStorage.setItem('oledProtectionSettings', JSON.stringify(toSave));
+}
+
+/**
+ * Update canvas position and size based on CONFIG
+ */
+function updateCanvasSize() {
+    canvas.style.left = CONFIG.posX + 'px';
+    canvas.style.top = CONFIG.posY + 'px';
+    canvas.style.width = CONFIG.width + 'px';
+    canvas.style.height = CONFIG.height + 'px';
+    canvas.width = CONFIG.width;
+    canvas.height = CONFIG.height;
+    generateParticles();
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
 /**
- * Resize canvas to match window dimensions
+ * Resize canvas to match window dimensions (for fullscreen mode)
  * Called on load and window resize for responsive behavior
  */
 function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    // Regenerate particles when canvas size changes
-    generateParticles();
+    if (CONFIG.width === window.innerWidth && CONFIG.height === window.innerHeight) {
+        CONFIG.width = window.innerWidth;
+        CONFIG.height = window.innerHeight;
+        updateCanvasSize();
+    }
 }
 
 /**
@@ -111,9 +181,10 @@ function generateParticles() {
  * Uses requestAnimationFrame for optimal performance and battery life
  */
 function animate() {
-    if (!ANIMATION_ENABLED) {
+    if (!CONFIG.enabled) {
         // If animation is disabled, clear canvas and stop
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(animate);
         return;
     }
 
@@ -168,19 +239,226 @@ function animate() {
 }
 
 // ============================================================================
+// UI CONTROLS
+// ============================================================================
+
+/**
+ * Initialize UI controls and event listeners
+ */
+function initUI() {
+    const panel = document.getElementById('controlPanel');
+    const enableCheckbox = document.getElementById('enableAnimation');
+    const posXSlider = document.getElementById('posX');
+    const posYSlider = document.getElementById('posY');
+    const widthSlider = document.getElementById('width');
+    const heightSlider = document.getElementById('height');
+    const opacitySlider = document.getElementById('opacity');
+    const particlesSlider = document.getElementById('particles');
+    const speedSlider = document.getElementById('speed');
+    const presetPassive = document.getElementById('presetPassive');
+    const presetFullscreen = document.getElementById('presetFullscreen');
+    const resetBtn = document.getElementById('resetSettings');
+
+    // Toggle panel visibility
+    const togglePanel = () => {
+        panel.classList.toggle('active');
+    };
+    
+
+    // Close panel
+    document.getElementById('closePanel').addEventListener('click', () => {
+        panel.classList.remove('active');
+    });
+
+    // Toggle with F3 key
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'F4') {
+            e.preventDefault();
+            togglePanel();
+        }
+    });
+
+    // Enable/disable animation
+    enableCheckbox.checked = CONFIG.enabled;
+    enableCheckbox.addEventListener('change', (e) => {
+        CONFIG.enabled = e.target.checked;
+        saveSettings();
+    });
+
+    // Position X
+    posXSlider.value = CONFIG.posX;
+    posXSlider.max = window.innerWidth || 1920;
+    document.getElementById('posXValue').textContent = CONFIG.posX;
+    posXSlider.addEventListener('input', (e) => {
+        CONFIG.posX = parseInt(e.target.value);
+        document.getElementById('posXValue').textContent = CONFIG.posX;
+        updateCanvasSize();
+        saveSettings();
+    });
+
+    // Position Y
+    posYSlider.value = CONFIG.posY;
+    posYSlider.max = window.innerHeight || 1080;
+    document.getElementById('posYValue').textContent = CONFIG.posY;
+    posYSlider.addEventListener('input', (e) => {
+        CONFIG.posY = parseInt(e.target.value);
+        document.getElementById('posYValue').textContent = CONFIG.posY;
+        updateCanvasSize();
+        saveSettings();
+    });
+
+    // Width
+    widthSlider.value = CONFIG.width;
+    widthSlider.max = window.innerWidth || 1920;
+    document.getElementById('widthValue').textContent = CONFIG.width;
+    widthSlider.addEventListener('input', (e) => {
+        CONFIG.width = parseInt(e.target.value);
+        document.getElementById('widthValue').textContent = CONFIG.width;
+        updateCanvasSize();
+        saveSettings();
+    });
+
+    // Height
+    heightSlider.value = CONFIG.height;
+    heightSlider.max = window.innerHeight || 1080;
+    document.getElementById('heightValue').textContent = CONFIG.height;
+    heightSlider.addEventListener('input', (e) => {
+        CONFIG.height = parseInt(e.target.value);
+        document.getElementById('heightValue').textContent = CONFIG.height;
+        updateCanvasSize();
+        saveSettings();
+    });
+
+    // Opacity
+    opacitySlider.value = CONFIG.noiseOpacity * 100;
+    document.getElementById('opacityValue').textContent = (CONFIG.noiseOpacity * 100).toFixed(1);
+    opacitySlider.addEventListener('input', (e) => {
+        CONFIG.noiseOpacity = parseFloat(e.target.value) / 100;
+        document.getElementById('opacityValue').textContent = parseFloat(e.target.value).toFixed(1);
+        saveSettings();
+    });
+
+    // Particle count
+    particlesSlider.value = CONFIG.noiseParticles;
+    document.getElementById('particleValue').textContent = CONFIG.noiseParticles;
+    particlesSlider.addEventListener('input', (e) => {
+        CONFIG.noiseParticles = parseInt(e.target.value);
+        document.getElementById('particleValue').textContent = CONFIG.noiseParticles;
+        generateParticles();
+        saveSettings();
+    });
+
+    // Speed
+    speedSlider.value = CONFIG.driftSpeed;
+    document.getElementById('speedValue').textContent = CONFIG.driftSpeed.toFixed(2);
+    speedSlider.addEventListener('input', (e) => {
+        CONFIG.driftSpeed = parseFloat(e.target.value);
+        document.getElementById('speedValue').textContent = CONFIG.driftSpeed.toFixed(2);
+        saveSettings();
+    });
+
+    // Preset: Passive Mode
+    presetPassive.addEventListener('click', () => {
+        CONFIG.posX = PRESETS.passiveMode.posX;
+        CONFIG.posY = PRESETS.passiveMode.posY;
+        CONFIG.width = PRESETS.passiveMode.width;
+        CONFIG.height = PRESETS.passiveMode.height;
+        
+        posXSlider.value = CONFIG.posX;
+        posYSlider.value = CONFIG.posY;
+        widthSlider.value = CONFIG.width;
+        heightSlider.value = CONFIG.height;
+        
+        document.getElementById('posXValue').textContent = CONFIG.posX;
+        document.getElementById('posYValue').textContent = CONFIG.posY;
+        document.getElementById('widthValue').textContent = CONFIG.width;
+        document.getElementById('heightValue').textContent = CONFIG.height;
+        
+        updateCanvasSize();
+        saveSettings();
+    });
+
+    // Preset: Fullscreen
+    presetFullscreen.addEventListener('click', () => {
+        CONFIG.posX = 0;
+        CONFIG.posY = 0;
+        CONFIG.width = window.innerWidth || 1920;
+        CONFIG.height = window.innerHeight || 1080;
+        
+        posXSlider.max = window.innerWidth || 1920;
+        posYSlider.max = window.innerHeight || 1080;
+        widthSlider.max = window.innerWidth || 1920;
+        heightSlider.max = window.innerHeight || 1080;
+        
+        posXSlider.value = CONFIG.posX;
+        posYSlider.value = CONFIG.posY;
+        widthSlider.value = CONFIG.width;
+        heightSlider.value = CONFIG.height;
+        
+        document.getElementById('posXValue').textContent = CONFIG.posX;
+        document.getElementById('posYValue').textContent = CONFIG.posY;
+        document.getElementById('widthValue').textContent = CONFIG.width;
+        document.getElementById('heightValue').textContent = CONFIG.height;
+        
+        updateCanvasSize();
+        saveSettings();
+    });
+
+    // Reset to defaults
+    resetBtn.addEventListener('click', () => {
+        CONFIG = { ...CONFIG, ...DEFAULT_CONFIG };
+        CONFIG.width = window.innerWidth || 1920;
+        CONFIG.height = window.innerHeight || 1080;
+        
+        enableCheckbox.checked = CONFIG.enabled;
+        posXSlider.value = CONFIG.posX;
+        posYSlider.value = CONFIG.posY;
+        widthSlider.value = CONFIG.width;
+        heightSlider.value = CONFIG.height;
+        opacitySlider.value = CONFIG.noiseOpacity * 100;
+        particlesSlider.value = CONFIG.noiseParticles;
+        speedSlider.value = CONFIG.driftSpeed;
+        
+        document.getElementById('posXValue').textContent = CONFIG.posX;
+        document.getElementById('posYValue').textContent = CONFIG.posY;
+        document.getElementById('widthValue').textContent = CONFIG.width;
+        document.getElementById('heightValue').textContent = CONFIG.height;
+        document.getElementById('opacityValue').textContent = (CONFIG.noiseOpacity * 100).toFixed(1);
+        document.getElementById('particleValue').textContent = CONFIG.noiseParticles;
+        document.getElementById('speedValue').textContent = CONFIG.driftSpeed.toFixed(2);
+        
+        updateCanvasSize();
+        saveSettings();
+    });
+}
+
+// ============================================================================
 // EVENT LISTENERS
 // ============================================================================
 
 // Initialize canvas on page load
 window.addEventListener('load', () => {
-    resizeCanvas();
-    if (ANIMATION_ENABLED) {
-        animate();
-    }
+    loadSettings();
+    updateCanvasSize();
+    initUI();
+    animate();
 });
 
 // Handle window resize for responsive behavior
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', () => {
+    resizeCanvas();
+    // Update slider max values
+    const posXSlider = document.getElementById('posX');
+    const posYSlider = document.getElementById('posY');
+    const widthSlider = document.getElementById('width');
+    const heightSlider = document.getElementById('height');
+    if (posXSlider) {
+        posXSlider.max = window.innerWidth || 1920;
+        posYSlider.max = window.innerHeight || 1080;
+        widthSlider.max = window.innerWidth || 1920;
+        heightSlider.max = window.innerHeight || 1080;
+    }
+});
 
 // ============================================================================
 // BURN-IN PROTECTION EXPLANATION
