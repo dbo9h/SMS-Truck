@@ -273,19 +273,14 @@ function initUI() {
         panel.classList.toggle('active');
     };
     
+    // Register global toggle function
+    globalTogglePanel = togglePanel;
+    
     toggleBtn.addEventListener('click', togglePanel);
 
     // Close panel
     document.getElementById('closePanel').addEventListener('click', () => {
         panel.classList.remove('active');
-    });
-
-    // Toggle with F3 key
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'F4') {
-            e.preventDefault();
-            togglePanel();
-        }
     });
 
     // Enable/disable animation
@@ -441,6 +436,58 @@ function initUI() {
         saveSettings();
     });
 }
+
+// ============================================================================
+// GLOBAL F4 KEY HANDLER
+// ============================================================================
+
+// Global F4 toggle function - accessible from anywhere
+let globalTogglePanel = null;
+let f4Pressed = false;
+
+// Set up F4 key listener immediately (before page load)
+(function() {
+    const handleF4KeyDown = (e) => {
+        const isF4 = e.key === 'F4' || 
+                     e.code === 'F4' || 
+                     e.keyCode === 115 ||
+                     (e.which === 115);
+        
+        if (isF4 && !f4Pressed) {
+            f4Pressed = true;
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            if (globalTogglePanel) {
+                globalTogglePanel();
+            }
+            return false;
+        }
+    };
+    
+    const handleF4KeyUp = (e) => {
+        const isF4 = e.key === 'F4' || 
+                     e.code === 'F4' || 
+                     e.keyCode === 115 ||
+                     (e.which === 115);
+        
+        if (isF4) {
+            f4Pressed = false;
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
+    
+    // Register on multiple targets for maximum compatibility
+    if (document.body) {
+        document.body.addEventListener('keydown', handleF4KeyDown, true);
+        document.body.addEventListener('keyup', handleF4KeyUp, true);
+    }
+    document.addEventListener('keydown', handleF4KeyDown, true);
+    document.addEventListener('keyup', handleF4KeyUp, true);
+    window.addEventListener('keydown', handleF4KeyDown, true);
+    window.addEventListener('keyup', handleF4KeyUp, true);
+})();
 
 // ============================================================================
 // EVENT LISTENERS
