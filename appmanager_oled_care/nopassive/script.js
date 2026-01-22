@@ -1,17 +1,8 @@
 /*
  * OLED Burn-in Protection Script
  * 
- * This script creates a subtle, moving noise pattern that prevents static UI elements
- * from causing permanent burn-in on OLED displays. The animation is designed to be:
- * - Extremely subtle and non-distracting
- * - Low CPU/GPU usage (optimized with requestAnimationFrame)
- * - Safe for extended gameplay sessions
- * 
- * How it protects OLED screens:
- * 1. Generates random low-opacity pixels that shift position over time
- * 2. Prevents any single pixel from displaying the same content continuously
- * 3. Uses very low opacity (1-3%) to remain invisible during gameplay
- * 4. Moves the pattern slowly to distribute pixel wear evenly
+ * This script creates a blur overlay that masks static UI elements (like "Passive Mode")
+ * to prevent burn-in on OLED displays. The blur effect is animated to prevent static pixels.
  */
 
 // ============================================================================
@@ -23,11 +14,11 @@ const DEFAULT_CONFIG = {
     enabled: true,
     posX: 0,
     posY: 0,
-    width: 1920,
-    height: 1080,
-    noiseOpacity: 0.02,
-    noiseParticles: 150,
-    driftSpeed: 0.05,
+    width: 300,
+    height: 100,
+    blurIntensity: 5,
+    blurOpacity: 0.3,
+    animationSpeed: 2,
 };
 
 // Animation settings (loaded from localStorage or defaults)
@@ -35,24 +26,20 @@ let CONFIG = {
     enabled: true,
     posX: 0,
     posY: 0,
-    width: window.innerWidth || 1920,
-    height: window.innerHeight || 1080,
-    noiseOpacity: 0.02,
-    noiseParticles: 150,
-    driftSpeed: 0.05,
-    particleMinSize: 1,
-    particleMaxSize: 3,
-    regenerateInterval: 180,
-    noiseColor: 'rgba(20, 20, 20, ',
+    width: 300,
+    height: 100,
+    blurIntensity: 5,
+    blurOpacity: 0.3,
+    animationSpeed: 2,
 };
 
 // Preset locations (common FiveM UI positions)
 const PRESETS = {
     passiveMode: {
-        posX: 50,
-        posY: 50,
-        width: 300,
-        height: 100,
+        posX: window.innerWidth / 2 - 90 || 800,
+        posY: window.innerHeight / 2 - -650 || 500,
+        width: 170,
+        height: 40,
     },
     fullscreen: {
         posX: 0,
@@ -68,15 +55,13 @@ const PRESETS = {
 
 const canvas = document.getElementById('protectionCanvas');
 const ctx = canvas.getContext('2d', {
-    alpha: true,           // Enable transparency
-    desynchronized: true   // Optimize for animation performance
+    alpha: true,
+    desynchronized: true
 });
 
-// Particle storage
-let particles = [];
+// Animation state
 let frameCount = 0;
-let offsetX = 0;
-let offsetY = 0;
+let blurOffset = 0;
 
 // ============================================================================
 // SETTINGS MANAGEMENT
@@ -91,8 +76,8 @@ function loadSettings() {
         try {
             const parsed = JSON.parse(saved);
             CONFIG = { ...CONFIG, ...parsed };
-            // Update canvas size from saved config
             updateCanvasSize();
+            updateCanvasBlur();
         } catch (e) {
             console.warn('Failed to load settings:', e);
         }
@@ -109,9 +94,9 @@ function saveSettings() {
         posY: CONFIG.posY,
         width: CONFIG.width,
         height: CONFIG.height,
-        noiseOpacity: CONFIG.noiseOpacity,
-        noiseParticles: CONFIG.noiseParticles,
-        driftSpeed: CONFIG.driftSpeed,
+        blurIntensity: CONFIG.blurIntensity,
+        blurOpacity: CONFIG.blurOpacity,
+        animationSpeed: CONFIG.animationSpeed,
     };
     localStorage.setItem('oledProtectionSettings', JSON.stringify(toSave));
 }
@@ -120,9 +105,8 @@ function saveSettings() {
  * Update canvas position and size based on CONFIG
  */
 function updateCanvasSize() {
-    // Ensure minimum dimensions
-    const width = Math.max(CONFIG.width || 100, 100);
-    const height = Math.max(CONFIG.height || 100, 100);
+    const width = Math.max(CONFIG.width || 50, 50);
+    const height = Math.max(CONFIG.height || 50, 50);
     
     canvas.style.left = (CONFIG.posX || 0) + 'px';
     canvas.style.top = (CONFIG.posY || 0) + 'px';
@@ -130,49 +114,16 @@ function updateCanvasSize() {
     canvas.style.height = height + 'px';
     canvas.width = width;
     canvas.height = height;
-    generateParticles();
-}
-
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
-
-/**
- * Resize canvas to match window dimensions (for fullscreen mode)
- * Called on load and window resize for responsive behavior
- */
-function resizeCanvas() {
-    if (CONFIG.width === window.innerWidth && CONFIG.height === window.innerHeight) {
-        CONFIG.width = window.innerWidth;
-        CONFIG.height = window.innerHeight;
-        updateCanvasSize();
-    }
 }
 
 /**
- * Generate random noise particles
- * These particles create the subtle moving pattern that prevents burn-in
+ * Update canvas blur filter
  */
-function generateParticles() {
-    particles = [];
-
-    for (let i = 0; i < CONFIG.noiseParticles; i++) {
-        particles.push({
-            // Random position across entire canvas
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-
-            // Random size within configured range
-            size: CONFIG.particleMinSize + Math.random() * (CONFIG.particleMaxSize - CONFIG.particleMinSize),
-
-            // Random drift direction for organic movement
-            vx: (Math.random() - 0.5) * CONFIG.driftSpeed,
-            vy: (Math.random() - 0.5) * CONFIG.driftSpeed,
-
-            // Slight opacity variation for more natural appearance
-            opacity: CONFIG.noiseOpacity * (0.5 + Math.random() * 0.5)
-        });
-    }
+function updateCanvasBlur() {
+    canvas.style.filter = `blur(${CONFIG.blurIntensity}px)`;
+    canvas.style.webkitFilter = `blur(${CONFIG.blurIntensity}px)`;
+    canvas.style.backdropFilter = `blur(${CONFIG.blurIntensity}px)`;
+    canvas.style.webkitBackdropFilter = `blur(${CONFIG.blurIntensity}px)`;
 }
 
 // ============================================================================
@@ -181,68 +132,49 @@ function generateParticles() {
 
 /**
  * Main animation loop
- * Renders and updates the burn-in protection pattern
- * Uses requestAnimationFrame for optimal performance and battery life
+ * Renders blur overlay to mask static UI elements and prevent burn-in
  */
 function animate() {
     if (!CONFIG.enabled) {
-        // If animation is disabled, clear canvas and stop
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         requestAnimationFrame(animate);
         return;
     }
 
-    // Clear previous frame (transparent background)
+    if (canvas.width === 0 || canvas.height === 0) {
+        requestAnimationFrame(animate);
+        return;
+    }
+
+    // Clear previous frame
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Update global drift offset for slow, continuous movement
-    // This ensures the entire pattern shifts gradually across the screen
-    offsetX += CONFIG.driftSpeed * 0.3;
-    offsetY += CONFIG.driftSpeed * 0.2;
+    // Update blur offset for subtle movement
+    blurOffset += CONFIG.animationSpeed * 0.1;
+    if (blurOffset > 100) blurOffset = 0;
 
-    // Render each noise particle
-    if (particles.length === 0 && canvas.width > 0 && canvas.height > 0) {
-        generateParticles();
-    }
-    
-    particles.forEach(particle => {
-        // Apply global drift offset to particle position
-        const x = particle.x + offsetX;
-        const y = particle.y + offsetY;
-
-        // Wrap particles around screen edges for seamless movement
-        const wrappedX = ((x % canvas.width) + canvas.width) % canvas.width;
-        const wrappedY = ((y % canvas.height) + canvas.height) % canvas.height;
-
-        // Draw particle with very low opacity
-        ctx.fillStyle = CONFIG.noiseColor + particle.opacity + ')';
+    // Create animated semi-transparent overlay with slight movement
+    // This masks the static "Passive Mode" text and prevents burn-in
+    const layers = 2;
+    for (let i = 0; i < layers; i++) {
+        const offset = Math.sin(blurOffset * 0.1 + i) * 1;
+        const opacity = CONFIG.blurOpacity / layers;
+        
+        ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
         ctx.fillRect(
-            Math.floor(wrappedX),
-            Math.floor(wrappedY),
-            particle.size,
-            particle.size
+            offset,
+            Math.cos(blurOffset * 0.15 + i) * 1,
+            canvas.width,
+            canvas.height
         );
-
-        // Update particle position with individual drift
-        particle.x += particle.vx;
-        particle.y += particle.vy;
-
-        // Wrap individual particle movement
-        if (particle.x < 0) particle.x += canvas.width;
-        if (particle.x > canvas.width) particle.x -= canvas.width;
-        if (particle.y < 0) particle.y += canvas.height;
-        if (particle.y > canvas.height) particle.y -= canvas.height;
-    });
-
-    // Periodically regenerate particles to create evolving pattern
-    // This prevents any predictable pattern from forming
-    frameCount++;
-    if (frameCount >= CONFIG.regenerateInterval) {
-        generateParticles();
-        frameCount = 0;
     }
 
-    // Request next frame
+    // Additional overlay for better masking
+    ctx.globalAlpha = CONFIG.blurOpacity;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1.0;
+
     requestAnimationFrame(animate);
 }
 
@@ -250,9 +182,6 @@ function animate() {
 // UI CONTROLS
 // ============================================================================
 
-/**
- * Initialize UI controls and event listeners
- */
 function initUI() {
     const panel = document.getElementById('controlPanel');
     const toggleBtn = document.getElementById('togglePanel');
@@ -261,24 +190,20 @@ function initUI() {
     const posYSlider = document.getElementById('posY');
     const widthSlider = document.getElementById('width');
     const heightSlider = document.getElementById('height');
-    const opacitySlider = document.getElementById('opacity');
-    const particlesSlider = document.getElementById('particles');
-    const speedSlider = document.getElementById('speed');
+    const blurIntensitySlider = document.getElementById('blurIntensity');
+    const blurOpacitySlider = document.getElementById('blurOpacity');
+    const animationSpeedSlider = document.getElementById('animationSpeed');
     const presetPassive = document.getElementById('presetPassive');
     const presetFullscreen = document.getElementById('presetFullscreen');
     const resetBtn = document.getElementById('resetSettings');
 
-    // Toggle panel visibility
     const togglePanel = () => {
         panel.classList.toggle('active');
     };
     
-    // Register global toggle function
     globalTogglePanel = togglePanel;
-    
     toggleBtn.addEventListener('click', togglePanel);
 
-    // Close panel
     document.getElementById('closePanel').addEventListener('click', () => {
         panel.classList.remove('active');
     });
@@ -334,31 +259,31 @@ function initUI() {
         saveSettings();
     });
 
-    // Opacity
-    opacitySlider.value = CONFIG.noiseOpacity * 100;
-    document.getElementById('opacityValue').textContent = (CONFIG.noiseOpacity * 100).toFixed(1);
-    opacitySlider.addEventListener('input', (e) => {
-        CONFIG.noiseOpacity = parseFloat(e.target.value) / 100;
-        document.getElementById('opacityValue').textContent = parseFloat(e.target.value).toFixed(1);
+    // Blur Intensity
+    blurIntensitySlider.value = CONFIG.blurIntensity;
+    document.getElementById('blurValue').textContent = CONFIG.blurIntensity;
+    blurIntensitySlider.addEventListener('input', (e) => {
+        CONFIG.blurIntensity = parseInt(e.target.value);
+        document.getElementById('blurValue').textContent = CONFIG.blurIntensity;
+        updateCanvasBlur();
         saveSettings();
     });
 
-    // Particle count
-    particlesSlider.value = CONFIG.noiseParticles;
-    document.getElementById('particleValue').textContent = CONFIG.noiseParticles;
-    particlesSlider.addEventListener('input', (e) => {
-        CONFIG.noiseParticles = parseInt(e.target.value);
-        document.getElementById('particleValue').textContent = CONFIG.noiseParticles;
-        generateParticles();
+    // Blur Opacity
+    blurOpacitySlider.value = CONFIG.blurOpacity * 100;
+    document.getElementById('opacityValue').textContent = Math.round(CONFIG.blurOpacity * 100);
+    blurOpacitySlider.addEventListener('input', (e) => {
+        CONFIG.blurOpacity = parseFloat(e.target.value) / 100;
+        document.getElementById('opacityValue').textContent = Math.round(parseFloat(e.target.value));
         saveSettings();
     });
 
-    // Speed
-    speedSlider.value = CONFIG.driftSpeed;
-    document.getElementById('speedValue').textContent = CONFIG.driftSpeed.toFixed(2);
-    speedSlider.addEventListener('input', (e) => {
-        CONFIG.driftSpeed = parseFloat(e.target.value);
-        document.getElementById('speedValue').textContent = CONFIG.driftSpeed.toFixed(2);
+    // Animation Speed
+    animationSpeedSlider.value = CONFIG.animationSpeed;
+    document.getElementById('speedValue').textContent = CONFIG.animationSpeed;
+    animationSpeedSlider.addEventListener('input', (e) => {
+        CONFIG.animationSpeed = parseFloat(e.target.value);
+        document.getElementById('speedValue').textContent = CONFIG.animationSpeed;
         saveSettings();
     });
 
@@ -412,27 +337,28 @@ function initUI() {
     // Reset to defaults
     resetBtn.addEventListener('click', () => {
         CONFIG = { ...CONFIG, ...DEFAULT_CONFIG };
-        CONFIG.width = window.innerWidth || 1920;
-        CONFIG.height = window.innerHeight || 1080;
+        CONFIG.width = 300;
+        CONFIG.height = 100;
         
         enableCheckbox.checked = CONFIG.enabled;
         posXSlider.value = CONFIG.posX;
         posYSlider.value = CONFIG.posY;
         widthSlider.value = CONFIG.width;
         heightSlider.value = CONFIG.height;
-        opacitySlider.value = CONFIG.noiseOpacity * 100;
-        particlesSlider.value = CONFIG.noiseParticles;
-        speedSlider.value = CONFIG.driftSpeed;
+        blurIntensitySlider.value = CONFIG.blurIntensity;
+        blurOpacitySlider.value = CONFIG.blurOpacity * 100;
+        animationSpeedSlider.value = CONFIG.animationSpeed;
         
         document.getElementById('posXValue').textContent = CONFIG.posX;
         document.getElementById('posYValue').textContent = CONFIG.posY;
         document.getElementById('widthValue').textContent = CONFIG.width;
         document.getElementById('heightValue').textContent = CONFIG.height;
-        document.getElementById('opacityValue').textContent = (CONFIG.noiseOpacity * 100).toFixed(1);
-        document.getElementById('particleValue').textContent = CONFIG.noiseParticles;
-        document.getElementById('speedValue').textContent = CONFIG.driftSpeed.toFixed(2);
+        document.getElementById('blurValue').textContent = CONFIG.blurIntensity;
+        document.getElementById('opacityValue').textContent = Math.round(CONFIG.blurOpacity * 100);
+        document.getElementById('speedValue').textContent = CONFIG.animationSpeed;
         
         updateCanvasSize();
+        updateCanvasBlur();
         saveSettings();
     });
 }
@@ -441,11 +367,9 @@ function initUI() {
 // GLOBAL F4 KEY HANDLER
 // ============================================================================
 
-// Global F4 toggle function - accessible from anywhere
 let globalTogglePanel = null;
 let f4Pressed = false;
 
-// Set up F4 key listener immediately (before page load)
 (function() {
     const handleF4KeyDown = (e) => {
         const isF4 = e.key === 'F4' || 
@@ -478,7 +402,6 @@ let f4Pressed = false;
         }
     };
     
-    // Register on multiple targets for maximum compatibility
     if (document.body) {
         document.body.addEventListener('keydown', handleF4KeyDown, true);
         document.body.addEventListener('keyup', handleF4KeyUp, true);
@@ -493,39 +416,39 @@ let f4Pressed = false;
 // EVENT LISTENERS
 // ============================================================================
 
-// Initialize canvas on page load
-window.addEventListener('load', () => {
-    // Ensure window dimensions are available
+function initialize() {
+    const defaultWidth = window.innerWidth || 1920;
+    const defaultHeight = window.innerHeight || 1080;
+    
     if (!CONFIG.width || CONFIG.width === 0) {
-        CONFIG.width = window.innerWidth || 1920;
+        CONFIG.width = 300;
     }
     if (!CONFIG.height || CONFIG.height === 0) {
-        CONFIG.height = window.innerHeight || 1080;
+        CONFIG.height = 100;
     }
     
     loadSettings();
     
-    // Ensure dimensions after loading settings
     if (!CONFIG.width || CONFIG.width === 0) {
-        CONFIG.width = window.innerWidth || 1920;
+        CONFIG.width = 300;
     }
     if (!CONFIG.height || CONFIG.height === 0) {
-        CONFIG.height = window.innerHeight || 1080;
+        CONFIG.height = 100;
     }
     
     updateCanvasSize();
+    updateCanvasBlur();
     initUI();
-    
-    // Start animation after a short delay to ensure canvas is ready
-    setTimeout(() => {
-        animate();
-    }, 100);
-});
+    animate();
+}
 
-// Handle window resize for responsive behavior
+if (document.readyState === 'loading') {
+    window.addEventListener('load', initialize);
+} else {
+    initialize();
+}
+
 window.addEventListener('resize', () => {
-    resizeCanvas();
-    // Update slider max values
     const posXSlider = document.getElementById('posX');
     const posYSlider = document.getElementById('posY');
     const widthSlider = document.getElementById('width');
@@ -537,29 +460,3 @@ window.addEventListener('resize', () => {
         heightSlider.max = window.innerHeight || 1080;
     }
 });
-
-// ============================================================================
-// BURN-IN PROTECTION EXPLANATION
-// ============================================================================
-
-/*
- * How this prevents OLED burn-in:
- * 
- * 1. PIXEL SHIFTING: The noise pattern constantly moves across the screen,
- *    ensuring no pixel displays the same static content for extended periods.
- * 
- * 2. SUBTLE OPACITY: Using 1-3% opacity means the pattern is nearly invisible
- *    but still causes slight pixel variation that prevents burn-in.
- * 
- * 3. RANDOM DISTRIBUTION: Particles are randomly positioned and move in
- *    different directions, creating unpredictable pixel activation patterns.
- * 
- * 4. CONTINUOUS REGENERATION: The pattern regenerates every ~3 seconds,
- *    preventing any long-term static elements.
- * 
- * 5. LOW BRIGHTNESS: Using near-black colors (RGB 20,20,20) minimizes
- *    additional screen wear while still providing protection.
- * 
- * 6. PERFORMANCE OPTIMIZED: requestAnimationFrame ensures the animation
- *    runs at the optimal frame rate without wasting CPU/GPU resources.
- */

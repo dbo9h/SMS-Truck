@@ -52,18 +52,18 @@
             </div>
             
             <div class="control-group">
-                <label>Opacity: <span id="opacityValue">2</span>%</label>
-                <input type="range" id="opacity" min="0" max="10" value="2" step="0.1">
+                <label>Blur Intensity: <span id="blurValue">5</span>px</label>
+                <input type="range" id="blurIntensity" min="0" max="20" value="5" step="1">
             </div>
             
             <div class="control-group">
-                <label>Particle Count: <span id="particleValue">150</span></label>
-                <input type="range" id="particles" min="10" max="500" value="150" step="10">
+                <label>Blur Opacity: <span id="opacityValue">30</span>%</label>
+                <input type="range" id="blurOpacity" min="0" max="100" value="30" step="1">
             </div>
             
             <div class="control-group">
-                <label>Speed: <span id="speedValue">0.05</span></label>
-                <input type="range" id="speed" min="0" max="0.2" value="0.05" step="0.01">
+                <label>Animation Speed: <span id="speedValue">2</span></label>
+                <input type="range" id="animationSpeed" min="0" max="10" value="2" step="0.5">
             </div>
             
             <div class="control-group">
@@ -77,6 +77,7 @@
         </div>
     </div>
     
+    <button id="togglePanel" class="toggle-btn">⚙️</button>
     
     <script src="script.js"></script>
 </body>
