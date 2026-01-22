@@ -21,6 +21,7 @@ class UserAppManager {
 
     initializeElements() {
         this.sidebar = document.getElementById('sidebar');
+        this.sidebarToggle = document.getElementById('sidebar-toggle');
         this.sidebarContent = document.querySelector('.sidebar-content');
         this.mainContent = document.getElementById('main-content');
         this.iframeContainer = document.getElementById('iframe-container');
@@ -47,6 +48,8 @@ class UserAppManager {
     }
 
     bindEvents() {
+        this.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
+
         this.loadBtn.addEventListener('click', () => this.loadApp());
         this.deleteBtn.addEventListener('click', () => this.deleteSelectedApp());
         this.urlInput.addEventListener('keypress', (e) => {
