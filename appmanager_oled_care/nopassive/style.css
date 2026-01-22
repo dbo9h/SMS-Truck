@@ -1,0 +1,47 @@
+/*
+ * OLED Burn-in Protection Overlay Styles
+ * 
+ * Key features:
+ * - 100% transparent background (no colors, gradients, or solid fills)
+ * - Full viewport coverage for complete screen protection
+ * - Pointer events disabled to allow gameplay interaction
+ * - Zero margins/padding for pixel-perfect alignment
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    /* Completely transparent background - critical for FiveM overlay */
+    background: transparent;
+}
+
+body {
+    /* Disable pointer events so clicks pass through to the game */
+    pointer-events: none;
+}
+
+#protectionCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    /* 
+     * Transparent canvas background
+     * The canvas will render subtle noise/pixels to prevent burn-in
+     * without blocking the game view
+     */
+    background: transparent;
+    /* Ensure canvas doesn't interfere with game input */
+    pointer-events: none;
+    /* Prevent any visual artifacts */
+    image-rendering: pixelated;
+}
