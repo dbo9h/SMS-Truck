@@ -363,6 +363,69 @@ input[type='number']:disabled {
 	text-align: right;
 }
 
+.item-amount-container {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	flex: 1;
+	justify-content: flex-end;
+}
+
+.item-amount-edit {
+	width: 80px;
+	padding: 4px 6px;
+	background-color: #3d3d3d;
+	border: 1px solid #555;
+	color: #e0e0e0;
+	border-radius: 3px;
+	text-align: right;
+	font-weight: bold;
+	font-size: 0.9em;
+}
+
+.item-amount-edit:focus {
+	outline: none;
+	border-color: #0d47a1;
+	background-color: #444;
+}
+
+.item-amount-edit::-webkit-inner-spin-button,
+.item-amount-edit::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+.item-amount-edit-container {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+}
+
+.item-amount-inline-edit {
+	width: 100px;
+	padding: 4px 8px;
+	background-color: #3d3d3d;
+	border: 1px solid #555;
+	color: #e0e0e0;
+	border-radius: 3px;
+	text-align: right;
+	font-weight: bold;
+	font-size: 0.95em;
+}
+
+.item-amount-inline-edit:focus {
+	outline: none;
+	border-color: #0d47a1;
+	background-color: #444;
+}
+
+.item-amount-inline-edit::-webkit-inner-spin-button,
+.item-amount-inline-edit::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
 .item-controls {
 	display: flex;
 	align-items: center;
@@ -463,8 +526,4 @@ input[type='number']:disabled {
 	background: #0d47a1;
 	cursor: pointer;
 	border: none;
-}
-
-.user-input select#refreshInterval {
-	min-width: 140px;
 }
