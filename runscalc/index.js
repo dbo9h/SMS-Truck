@@ -101,128 +101,12 @@ let selectedItems = [];
 const DEFAULT_API_URL = "https://tycoon-2epova.users.cfx.re/status/";
 const ALTERNATIVE_API_URL = "https://d.ttstats.eu/public-main/status/";
 let apiUrl = DEFAULT_API_URL;
-let autoRefreshTimer = null;
-
-// In-app console logging
-const originalConsoleLog = console.log;
-const originalConsoleError = console.error;
-const originalConsoleWarn = console.warn;
-
-function addToConsole(message, type = 'log') {
-	const consoleOutput = document.getElementById('console-output');
-	if (!consoleOutput) return;
-
-	const logEntry = document.createElement('div');
-	logEntry.className = `console-log ${type}`;
-
-	// Format the message - handle arrays of arguments
-	let formattedMessage = '';
-	if (Array.isArray(message)) {
-		formattedMessage = message.map(arg => {
-			if (typeof arg === 'object' && arg !== null) {
-				try {
-					return JSON.stringify(arg, null, 2);
-				} catch (e) {
-					return String(arg);
-				}
-			}
-			return String(arg);
-		}).join(' ');
-	} else if (typeof message === 'object' && message !== null) {
-		try {
-			formattedMessage = JSON.stringify(message, null, 2);
-		} catch (e) {
-			formattedMessage = String(message);
-		}
-	} else {
-		formattedMessage = String(message);
-	}
-
-	const timestamp = new Date().toLocaleTimeString();
-	logEntry.textContent = `[${timestamp}] ${formattedMessage}`;
-
-	consoleOutput.appendChild(logEntry);
-	consoleOutput.scrollTop = consoleOutput.scrollHeight;
-
-	// Keep only last 100 entries
-	while (consoleOutput.children.length > 100) {
-		consoleOutput.removeChild(consoleOutput.firstChild);
-	}
-}
-
-// Override console methods
-console.log = function (...args) {
-	originalConsoleLog.apply(console, args);
-	addToConsole(args, 'info');
-};
-
-console.error = function (...args) {
-	originalConsoleError.apply(console, args);
-	addToConsole(args, 'error');
-};
-
-console.warn = function (...args) {
-	originalConsoleWarn.apply(console, args);
-	addToConsole(args, 'warn');
-};
-
-// Real-time storage update handler
-function updateStorageFromMessage(messageData) {
-	console.log("📨 Received storage update message:", messageData);
-
-	// Handle different message formats from FiveM
-	let storageData = null;
-
-	// Check if it's a direct storage update
-	if (messageData.type === "storageUpdate" && messageData.data) {
-		storageData = messageData.data;
-	} else if (messageData.storages) {
-		// Full storage list update
-		storageData = messageData;
-	} else if (messageData.storage && messageData.inventory) {
-		// Single storage update
-		storageData = { storages: [{ name: messageData.storage, inventory: messageData.inventory }] };
-	}
-
-	if (!storageData || !storageData.storages) {
-		console.log("⚠️ Unknown message format, ignoring");
-		return;
-	}
-
-	const userId = localStorage.getItem("userId");
-	if (!userId) {
-		console.log("⚠️ No user ID set, cannot update storage");
-		return;
-	}
-
-	// Update each storage in the message
-	storageData.storages.forEach(updatedStorage => {
-		const parsed = parseStorage(updatedStorage.name, updatedStorage.inventory || {}, userId);
-		if (!parsed) return;
-
-		// Find existing storage and update it
-		const existingIndex = storages.findIndex(s => s.storage.id === parsed.storage.id);
-		if (existingIndex !== -1) {
-			console.log(`✓ Updated storage: ${parsed.storage.name}`);
-			storages[existingIndex] = parsed;
-		} else {
-			console.log(`✓ Added new storage: ${parsed.storage.name}`);
-			storages.push(parsed);
-		}
-	});
-
-	// Refresh UI to show updated amounts
-	populateStorageDropdowns();
-	renderSelectedItems(); // This will update "items left" counts
-	calculateRuns(); // This will recalculate runs with new amounts
-
-	console.log("✓ Storage data updated, UI refreshed");
-}
+let autoRefreshInterval = null;
 
 function toggleSettings() {
 	const userInput = document.getElementById("main").querySelector(".user-input");
 	settingsCollapsed = !settingsCollapsed;
-
+	
 	if (settingsCollapsed) {
 		userInput.classList.add("collapsed");
 	} else {
@@ -233,7 +117,7 @@ function toggleSettings() {
 function initDragging() {
 	const userInput = document.getElementById("main").querySelector(".user-input");
 	const buttonContainer = userInput.querySelector(".button-container");
-
+	
 	// Load saved position
 	const savedX = localStorage.getItem('runsCalcPosX');
 	const savedY = localStorage.getItem('runsCalcPosY');
@@ -241,51 +125,51 @@ function initDragging() {
 		userInput.style.left = savedX + 'px';
 		userInput.style.top = savedY + 'px';
 	}
-
+	
 	// Make button container draggable
-	buttonContainer.addEventListener('mousedown', function (e) {
+	buttonContainer.addEventListener('mousedown', function(e) {
 		// Don't drag if clicking on the button itself or its children
 		if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
-
+		
 		isDragging = true;
 		userInput.classList.add('dragging');
-
+		
 		dragStartX = e.clientX;
 		dragStartY = e.clientY;
-
+		
 		const rect = userInput.getBoundingClientRect();
 		initialX = rect.left;
 		initialY = rect.top;
-
+		
 		e.preventDefault();
 		e.stopPropagation();
 	});
-
-	document.addEventListener('mousemove', function (e) {
+	
+	document.addEventListener('mousemove', function(e) {
 		if (!isDragging) return;
-
+		
 		const deltaX = e.clientX - dragStartX;
 		const deltaY = e.clientY - dragStartY;
-
+		
 		let newX = initialX + deltaX;
 		let newY = initialY + deltaY;
-
+		
 		// Keep within viewport bounds
 		const maxX = window.innerWidth - userInput.offsetWidth;
 		const maxY = window.innerHeight - userInput.offsetHeight;
-
+		
 		newX = Math.max(0, Math.min(newX, maxX));
 		newY = Math.max(0, Math.min(newY, maxY));
-
+		
 		userInput.style.left = newX + 'px';
 		userInput.style.top = newY + 'px';
-
+		
 		// Save position
 		localStorage.setItem('runsCalcPosX', newX);
 		localStorage.setItem('runsCalcPosY', newY);
 	});
-
-	document.addEventListener('mouseup', function () {
+	
+	document.addEventListener('mouseup', function() {
 		if (isDragging) {
 			isDragging = false;
 			userInput.classList.remove('dragging');
@@ -296,7 +180,7 @@ function initDragging() {
 function toggleSubmenu(header) {
 	const content = header.nextElementSibling;
 	const toggle = header.querySelector(".submenu-toggle");
-
+	
 	if (content.classList.contains("collapsed")) {
 		content.classList.remove("collapsed");
 		toggle.classList.remove("collapsed");
@@ -311,18 +195,18 @@ function calculateCapacity() {
 	const trailerSelect = document.getElementById("trailer").value;
 	const postOpChecked = document.getElementById("postop").checked;
 	const premiumChecked = document.getElementById("premium").checked;
-
+	
 	let capacity = 0;
-
+	
 	// MK15 is a cab that can be used WITH a trailer (both capacities add together)
 	if (mk15Checked) {
 		capacity += TRAILER_CAPACITIES.mk15.capacity;
 	}
-
+	
 	if (trailerSelect && TRAILER_CAPACITIES[trailerSelect]) {
 		capacity += TRAILER_CAPACITIES[trailerSelect].capacity;
 	}
-
+	
 	// Apply multipliers (same as Dogg folder: 1 + premium*0.15 + postop*0.15)
 	if (capacity > 0) {
 		let multiplier = 1;
@@ -330,14 +214,14 @@ function calculateCapacity() {
 		if (postOpChecked) multiplier += 0.15;
 		capacity = Math.round(capacity * multiplier);
 	}
-
+	
 	return capacity;
 }
 
 function updateAmountFromStorage() {
 	const sourceStorageId = document.getElementById("sourceStorage").value;
 	const itemType = document.getElementById("itemType").value;
-
+	
 	if (sourceStorageId && itemType) {
 		const storage = storages.find(s => s.storage.id === sourceStorageId);
 		if (storage) {
@@ -354,166 +238,111 @@ function updateAmountFromStorage() {
 
 function addItem() {
 	const itemType = document.getElementById("itemType").value;
-	const inputAmount = parseInt(document.getElementById("itemAmount").value) || 0;
+	let amount = parseInt(document.getElementById("itemAmount").value) || 0;
 	const sourceStorageId = document.getElementById("sourceStorage").value;
-
+	
 	if (!itemType) {
 		showError("Please select an item type");
 		return;
 	}
-
-	if (!sourceStorageId) {
-		showError("Please select a source storage first");
-		return;
+	
+	// Auto-detect from source storage if amount is 0
+	if (amount <= 0) {
+		if (sourceStorageId) {
+			const storage = storages.find(s => s.storage.id === sourceStorageId);
+			if (storage) {
+				const item = storage.items.find(i => i.item && i.item.id === itemType);
+				if (item && item.amount > 0) {
+					amount = item.amount;
+					document.getElementById("itemAmount").value = amount;
+				} else {
+					showError(`No ${ITEM_WEIGHTS[itemType]?.name || 'item'} found in selected storage`);
+					return;
+				}
+			} else {
+				showError("Please enter an amount or select a valid source storage");
+				return;
+			}
+		} else {
+			showError("Please enter an amount or select a source storage");
+			return;
+		}
 	}
-
-	// Get current amount from storage automatically
-	const storage = storages.find(s => s.storage.id === sourceStorageId);
-	if (!storage) {
-		showError("Storage not found");
-		return;
-	}
-
-	const item = storage.items.find(i => i.item && i.item.id === itemType);
-	if (!item || item.amount <= 0) {
-		showError(`No ${ITEM_WEIGHTS[itemType]?.name || 'item'} found in selected storage`);
-		return;
-	}
-
-	const currentInStorage = item.amount;
-
-	// Use input amount if provided, otherwise use full storage amount
-	const amountToTrack = inputAmount > 0 ? inputAmount : currentInStorage;
-
-	// Check if item already tracked
+	
+	// Add or update item
 	const existingIndex = selectedItems.findIndex(i => i.itemId === itemType);
 	if (existingIndex !== -1) {
-		showError(`${ITEM_WEIGHTS[itemType]?.name} is already being tracked`);
-		return;
+		selectedItems[existingIndex].amount += amount;
+	} else {
+		selectedItems.push({
+			itemId: itemType,
+			amount: amount
+		});
 	}
-
-	// Add new item - store ORIGINAL storage amount for tracking
-	selectedItems.push({
-		itemId: itemType,
-		amount: amountToTrack, // How much user wants to move
-		originalAmount: currentInStorage // Original amount in storage (for tracking changes)
-	});
-
+	
 	renderSelectedItems();
-	document.getElementById("itemAmount").value = 0; // Reset input
+	updateAmountFromStorage();
 	showError("");
-	console.log(`✓ Tracking ${ITEM_WEIGHTS[itemType]?.name}: ${amountToTrack} to move (${currentInStorage} in storage)`);
 }
 
 function removeItem(index) {
 	selectedItems.splice(index, 1);
 	renderSelectedItems();
+	updateAmountFromStorage();
 	showError("");
-}
-
-function updateSelectedItemAmount(index, newAmount) {
-	const amount = parseInt(newAmount) || 0;
-	if (amount < 0) return;
-
-	selectedItems[index].amount = amount;
-	saveSelectedItems();
-	calculateRuns(); // Recalculate with new amount
-	console.log(`✏️ Updated amount to ${amount}`);
 }
 
 function getRemainingInStorage(itemId) {
 	const sourceStorageId = document.getElementById("sourceStorage").value;
 	if (!sourceStorageId) return null;
-
+	
 	// Use the EXACT same logic as updateAmountFromStorage()
 	const storage = storages.find(s => s.storage.id === sourceStorageId);
 	if (!storage) return null;
-
+	
 	const item = storage.items.find(i => i.item && i.item.id === itemId);
 	if (!item) return null;
-
+	
 	// Return the ACTUAL amount in storage from API (real-time data)
 	// This is what's actually left in storage right now, not calculated
 	const actualAmount = item.amount || 0;
-
+	
 	return actualAmount;
 }
 
 function renderSelectedItems() {
 	const itemsList = document.getElementById("selected-items-list");
-
+	
 	if (selectedItems.length === 0) {
 		itemsList.innerHTML = '<div class="no-items-message">No items selected. Add items above.</div>';
 		// Recalculate runs when list is empty
 		calculateRuns();
 		return;
 	}
-
+	
 	itemsList.innerHTML = "";
-
-	// Track items to remove (when storage is empty)
-	const itemsToRemove = [];
-
+	
 	selectedItems.forEach((item, index) => {
 		const itemData = ITEM_WEIGHTS[item.itemId];
 		if (!itemData) return;
-
-		const currentInStorage = getRemainingInStorage(item.itemId);
-		const originalAmount = item.originalAmount || item.amount;
-
-		// Auto-remove if storage is empty (all items moved)
-		if (currentInStorage !== null && currentInStorage === 0) {
-			itemsToRemove.push(index);
-			console.log(`🗑️ Auto-removing ${itemData.name} (storage empty)`);
-			return; // Skip rendering this item
-		}
-
-		// Calculate how many were moved (original - current)
-		const movedAmount = currentInStorage !== null ? (originalAmount - currentInStorage) : 0;
-
-		console.log(`📊 ${itemData.name}: original=${originalAmount}, current=${currentInStorage}, moved=${movedAmount}`);
-
-		const storageText = currentInStorage !== null
-			? ` <span style="color: #888; font-size: 0.85em;">(${currentInStorage.toLocaleString()} in storage, ${movedAmount > 0 ? movedAmount.toLocaleString() + ' moved' : 'none moved'})</span>`
-			: '';
-
+		
+		const remaining = getRemainingInStorage(item.itemId);
+		const remainingText = remaining !== null ? ` <span style="color: #888;">(${remaining.toLocaleString()} left)</span>` : '';
+		
 		const entry = document.createElement("div");
 		entry.className = "item-entry";
-
+		
 		entry.innerHTML = `
 			<span class="item-name">${itemData.name}</span>
-			<div class="item-amount-edit-container">
-				<input 
-					type="number" 
-					class="item-amount-inline-edit" 
-					value="${item.amount}" 
-					min="0"
-					max="${currentInStorage || 999999}"
-					onchange="updateSelectedItemAmount(${index}, this.value)"
-					onclick="this.select()"
-				/>
-				${storageText}
-			</div>
+			<span class="item-amount">${item.amount.toLocaleString()}${remainingText}</span>
 			<div class="item-controls">
 				<button class="remove-item" onclick="removeItem(${index})" title="Remove item">×</button>
 			</div>
 		`;
-
+		
 		itemsList.appendChild(entry);
 	});
-
-	// Remove items with empty storage (in reverse order to maintain indices)
-	for (let i = itemsToRemove.length - 1; i >= 0; i--) {
-		selectedItems.splice(itemsToRemove[i], 1);
-	}
-
-	// If items were removed, save and re-render
-	if (itemsToRemove.length > 0) {
-		saveSelectedItems();
-		renderSelectedItems(); // Re-render without removed items
-		return;
-	}
-
+	
 	saveSelectedItems();
 	// Force immediate recalculation
 	calculateRuns();
@@ -542,123 +371,105 @@ function calculateRuns() {
 	const perItemRunsDiv = document.getElementById("per-item-runs");
 	const totalRunsElement = document.getElementById("total-runs-required");
 	const trailerCapacityElement = document.getElementById("trailer-capacity");
-
+	
 	if (!perItemRunsDiv || !totalRunsElement || !trailerCapacityElement) {
 		console.error("Results elements not found!");
 		return;
 	}
-
+	
 	// Update trailer capacity always
 	trailerCapacityElement.textContent = capacity.toLocaleString();
-
+	
 	if (capacity === 0) {
 		perItemRunsDiv.innerHTML = '<div class="no-items-message">Select a trailer to calculate runs</div>';
 		totalRunsElement.textContent = "0";
 		return;
 	}
-
+	
 	const sourceStorageId = document.getElementById("sourceStorage").value;
 	if (!sourceStorageId) {
 		perItemRunsDiv.innerHTML = '<div class="no-items-message">Select source storage to calculate runs</div>';
 		totalRunsElement.textContent = "0";
 		return;
 	}
-
+	
 	const storage = storages.find(s => s.storage.id === sourceStorageId);
 	if (!storage || !storage.items || storage.items.length === 0) {
 		perItemRunsDiv.innerHTML = '<div class="no-items-message">No items in selected storage</div>';
 		totalRunsElement.textContent = "0";
-		console.log("⚠️ No storage found or storage is empty");
 		return;
 	}
-
+	
 	let totalRuns = 0;
 	let totalWeight = 0;
 	perItemRunsDiv.innerHTML = "";
-
+	
 	// If items are selected, calculate runs for selected items only
 	// If no items selected, calculate runs for ALL items in storage
 	if (selectedItems.length > 0) {
-		console.log(`📊 Calculating runs for ${selectedItems.length} selected items`);
-		// Calculate runs based on items MOVED (original - current in storage)
+		// Calculate runs for selected items - use SELECTED amount for runs, show remaining for info
 		selectedItems.forEach(item => {
 			const itemData = ITEM_WEIGHTS[item.itemId];
 			if (!itemData) return;
-
-			// Get current amount in source storage
-			const currentInStorage = getRemainingInStorage(item.itemId);
-			const originalAmount = item.originalAmount || item.amount;
-
-			// Calculate how many were already moved (original storage - current storage)
-			const alreadyMoved = currentInStorage !== null ? Math.max(0, originalAmount - currentInStorage) : 0;
-
-			// Calculate how much is LEFT to move (user's target - already moved)
-			const leftToMove = Math.max(0, item.amount - alreadyMoved);
-
-			// Calculate runs based on what's LEFT to move
-			const amountToCalculate = leftToMove;
-
+			
+			// Get remaining items in source storage (for display only)
+			const remaining = getRemainingInStorage(item.itemId);
+			
+			// Calculate runs based on SELECTED amount (what you're moving), not remaining
+			const amountToCalculate = item.amount;
+			
 			const weight = amountToCalculate * itemData.weight;
 			const runs = Math.ceil(weight / capacity);
-
-			// Skip items with 0 runs (already completed)
-			if (runs === 0) {
-				console.log(`  - ${itemData.name}: completed (${item.amount} target reached)`);
-				return;
-			}
-
 			totalRuns += runs;
 			totalWeight += weight;
-
+			
+			const remainingText = remaining !== null ? ` <span style="color: #888; font-size: 0.9em;">(${remaining.toLocaleString()} left)</span>` : '';
+			
 			const runDiv = document.createElement("div");
 			runDiv.className = "per-item-run";
-			runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}`;
+			runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}${remainingText}`;
 			perItemRunsDiv.appendChild(runDiv);
-
-			console.log(`  - ${itemData.name}: ${runs} runs (${leftToMove} left to move: ${item.amount} target - ${alreadyMoved} moved)`);
 		});
 	} else {
-		console.log(`📊 Calculating runs for ALL items in storage (${storage.items.length} items)`);
 		// No items selected, show runs for ALL items in storage
 		storage.items.forEach(storageItem => {
 			if (!storageItem.item || !storageItem.amount) return;
-
+			
 			const itemData = ITEM_WEIGHTS[storageItem.item.id];
 			if (!itemData) return;
-
+			
 			const amountToCalculate = storageItem.amount;
 			const weight = amountToCalculate * itemData.weight;
 			const runs = Math.ceil(weight / capacity);
 			totalRuns += runs;
 			totalWeight += weight;
-
+			
 			const remainingText = ` <span style="color: #888; font-size: 0.9em;">(${amountToCalculate.toLocaleString()} left)</span>`;
-
+			
 			const runDiv = document.createElement("div");
 			runDiv.className = "per-item-run";
 			runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}${remainingText}`;
 			perItemRunsDiv.appendChild(runDiv);
 		});
 	}
-
+	
 	if (perItemRunsDiv.innerHTML === "") {
 		perItemRunsDiv.innerHTML = '<div class="no-items-message">No items to calculate</div>';
 	}
-
+	
 	// Update total runs immediately
 	totalRunsElement.textContent = totalRuns.toLocaleString();
-	console.log(`✓ Total runs: ${totalRuns}`);
 }
 
 function populateItemDropdown() {
 	const itemSelect = document.getElementById("itemType");
 	itemSelect.innerHTML = '<option value="">Select Item</option>';
-
+	
 	// Sort items by name for easier selection
-	const sortedItems = Object.entries(ITEM_WEIGHTS).sort((a, b) =>
+	const sortedItems = Object.entries(ITEM_WEIGHTS).sort((a, b) => 
 		a[1].name.localeCompare(b[1].name)
 	);
-
+	
 	sortedItems.forEach(([id, item]) => {
 		const option = document.createElement("option");
 		option.value = id;
@@ -670,23 +481,35 @@ function populateItemDropdown() {
 function populateStorageDropdowns() {
 	const sourceSelect = document.getElementById("sourceStorage");
 	const destSelect = document.getElementById("destinationStorage");
-
+	
+	// Save current selections before clearing
+	const savedSourceStorage = sourceSelect.value;
+	const savedDestinationStorage = destSelect.value;
+	
 	// Clear existing options except first
 	sourceSelect.innerHTML = '<option value="">Select Source Storage</option>';
 	destSelect.innerHTML = '<option value="">Select Destination Storage</option>';
-
+	
 	// Add storages
 	storages.forEach(storage => {
 		const sourceOption = document.createElement("option");
 		sourceOption.value = storage.storage.id;
 		sourceOption.textContent = storage.storage.name;
 		sourceSelect.appendChild(sourceOption);
-
+		
 		const destOption = document.createElement("option");
 		destOption.value = storage.storage.id;
 		destOption.textContent = storage.storage.name;
 		destSelect.appendChild(destOption);
 	});
+	
+	// Restore selections if they still exist
+	if (savedSourceStorage && storages.some(s => s.storage.id === savedSourceStorage)) {
+		sourceSelect.value = savedSourceStorage;
+	}
+	if (savedDestinationStorage && storages.some(s => s.storage.id === savedDestinationStorage)) {
+		destSelect.value = savedDestinationStorage;
+	}
 }
 
 async function apiFetch(endpoint, apiKey) {
@@ -695,7 +518,7 @@ async function apiFetch(endpoint, apiKey) {
 			"X-Tycoon-Key": apiKey
 		}
 	});
-
+	
 	if (!response.ok) {
 		let errorMsg;
 		if (response.status === 402) {
@@ -707,70 +530,33 @@ async function apiFetch(endpoint, apiKey) {
 		}
 		throw new Error(`Failed to fetch api: (${response.status}) ${errorMsg || response.statusText}`);
 	}
-
+	
 	return response.json();
 }
 
 async function fetchStorages() {
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
-
+	
 	if (!apiKey || !userId) {
 		showError("Please enter API Key and User ID");
 		return;
 	}
-
-	// Check if we have cached data
-	const cacheKey = `storages_${userId}`;
-	const cachedData = localStorage.getItem(cacheKey);
-	const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
-
-	// Use cached data if it exists and is less than 5 minutes old
-	const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-	if (cachedData && cacheTimestamp) {
-		const age = Date.now() - parseInt(cacheTimestamp);
-		if (age < CACHE_DURATION) {
-			console.log("📦 Using cached storage data (no API charge!)");
-			try {
-				const storageList = JSON.parse(cachedData);
-				storages = storageList.map(storage => {
-					const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
-					if (!parsed) console.warn(`❌ Failed to parse storage: ${storage.name}`);
-					return parsed;
-				}).filter(s => s !== null);
-
-				console.log("✓ Successfully loaded", storages.length, "storages from cache");
-				populateStorageDropdowns();
-				renderSelectedItems();
-				calculateRuns();
-				showError("");
-				return;
-			} catch (e) {
-				console.warn("Failed to load cache, fetching from API");
-			}
-		}
-	}
-
+	
 	try {
-		console.log("🌐 Fetching from API (1 API charge)");
 		const data = await apiFetch(`storages/${userId}`, apiKey);
 		const storageList = data.storages || [];
-
-		// Cache the data
-		localStorage.setItem(cacheKey, JSON.stringify(storageList));
-		localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
-		console.log("💾 Cached storage data for 5 minutes");
-
+		
 		console.log("📦 API returned", storageList.length, "storage names:", storageList.map(s => s.name));
-
+		
 		storages = storageList.map(storage => {
 			const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
 			if (!parsed) console.warn(`❌ Failed to parse storage: ${storage.name}`);
 			return parsed;
 		}).filter(s => s !== null);
-
+		
 		console.log("✓ Successfully parsed", storages.length, "storages");
-
+		
 		populateStorageDropdowns();
 		// Update remaining counts and recalculate when storage is refreshed
 		renderSelectedItems();
@@ -782,100 +568,21 @@ async function fetchStorages() {
 	}
 }
 
-// Update storage from FiveM chest data (NO API CALLS!)
-function updateStorageFromChest(chestId, chestData) {
-	console.log(`📦 Processing chest data for: ${chestId}`, chestData);
-
-	const userId = localStorage.getItem("userId");
-	if (!userId) return;
-
-	if (!chestData || typeof chestData !== "object") {
-		console.warn("Invalid chest data");
-		return;
-	}
-
-	// Chest data is inventory format: {itemName: amount, ...}
-	// We need to update our storages with this data
-	let updated = false;
-
-	storages.forEach(storage => {
-		if (storage && storage.items) {
-			storage.items.forEach(storageItem => {
-				if (!storageItem.item) return;
-
-				// Try to find matching item in chest data by name
-				const itemName = storageItem.item.name;
-				const itemId = storageItem.item.id;
-
-				// Check both name and id
-				if (chestData[itemName] !== undefined) {
-					const newAmount = parseInt(chestData[itemName]) || 0;
-					if (storageItem.amount !== newAmount) {
-						console.log(`  ✓ ${itemName}: ${storageItem.amount} → ${newAmount}`);
-						storageItem.amount = newAmount;
-						updated = true;
-					}
-				} else if (chestData[itemId] !== undefined) {
-					const newAmount = parseInt(chestData[itemId]) || 0;
-					if (storageItem.amount !== newAmount) {
-						console.log(`  ✓ ${itemName}: ${storageItem.amount} → ${newAmount}`);
-						storageItem.amount = newAmount;
-						updated = true;
-					}
-				}
-			});
-		}
-	});
-
-	if (updated) {
-		// Refresh UI with updated data
-		renderSelectedItems();
-		calculateRuns();
-		console.log("✅ Storage updated from FiveM (no API charge!)");
-	} else {
-		console.log("⚠️ No matching items found in chest data");
-	}
-}
-
-// Silent refresh for auto-polling (ALWAYS fetches fresh data)
-async function silentRefreshStorages() {
-	const apiKey = localStorage.getItem("apiKey");
-	const userId = localStorage.getItem("userId");
-
-	if (!apiKey || !userId) return;
-
-	try {
-		const data = await apiFetch(`storages/${userId}`, apiKey);
-		const storageList = data.storages || [];
-
-		storages = storageList.map(storage => {
-			const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
-			return parsed;
-		}).filter(s => s !== null);
-
-		renderSelectedItems();
-		calculateRuns();
-	} catch (error) {
-		console.error("Silent refresh failed:", error);
-	}
-}
-
-
 function parseStorage(storageName, inventory, userId) {
 	// Parse storage ID from name (similar to Dogg's H function)
 	let storageId = storageName.replace(/^chest_u\d+/, "").replace(/^chest_self_storage:\d+:(.+):chest$/, "$1").replace(/^_/, "");
-
+	
 	// Handle vehicle storage names
 	const vehicleMatch = storageName.match(/^veh_\w+_(.+)$/);
 	if (vehicleMatch) {
 		storageId = vehicleMatch[1];
 	}
-
+	
 	// Skip invalid storage names
 	if (/^chest_u\d+/.test(storageName) || /^chest_self_storage:\d+:/.test(storageName)) {
 		return null;
 	}
-
+	
 	// Handle faq_ storages - treat as valid storage
 	if (storageId.startsWith("faq_")) {
 		// Create a custom storage entry for faq_ storages
@@ -905,13 +612,13 @@ function parseStorage(storageName, inventory, userId) {
 				amount: amount
 			};
 		}).filter(i => i !== null);
-
+		
 		return {
 			storage: customStorage,
 			items: parsedItems
 		};
 	}
-
+	
 	const storage = getStorageById(storageId);
 	if (!storage) {
 		console.warn(`Unknown storage: '${storageId}', assuming vehicle`);
@@ -920,21 +627,21 @@ function parseStorage(storageName, inventory, userId) {
 			items: []
 		};
 	}
-
+	
 	// Parse items from inventory
 	const parsedItems = Object.entries(inventory).map(([itemId, itemData]) => {
 		const amount = typeof itemData === 'object' ? itemData.amount : itemData;
-
+		
 		// Clean item ID (remove HTML tags and entities like Dogg does)
 		let cleanItemId = itemId.replace(/(<.+?>)|(&#.+?;)/g, "");
-
+		
 		// Handle special cases
 		if (cleanItemId.startsWith("gut_knife")) {
 			cleanItemId = cleanItemId.split("|")[0];
 		} else if (cleanItemId.startsWith("aircargo")) {
 			return null;
 		}
-
+		
 		const item = ITEM_WEIGHTS[cleanItemId];
 		if (!item) {
 			if (cleanItemId !== "outfit|ig_furry") {
@@ -942,13 +649,13 @@ function parseStorage(storageName, inventory, userId) {
 			}
 			return null;
 		}
-
+		
 		return {
 			item: { id: cleanItemId, name: item.name, weight: item.weight },
 			amount: amount
 		};
 	}).filter(i => i !== null);
-
+	
 	return {
 		storage: storage,
 		items: parsedItems
@@ -972,7 +679,7 @@ function getStorageById(id) {
 		"fthq": { name: "Pillbox Hill Storage Unit", id: "fthq", type: "storage" },
 		"bats": { name: "Rogers Salvage & Scrap", id: "bats", type: "storage" }
 	};
-
+	
 	return storageMap[id] || null;
 }
 
@@ -980,18 +687,18 @@ function saveApiKey() {
 	const apiKey = document.getElementById("apiKey").value;
 	const userId = document.getElementById("userId").value;
 	const alternativeApi = document.getElementById("alternativeApi").checked;
-
+	
 	if (!apiKey || !userId) {
 		showError("Please enter both API Key and User ID");
 		return;
 	}
-
+	
 	localStorage.setItem("apiKey", apiKey);
 	localStorage.setItem("userId", userId);
 	localStorage.setItem("alternativeApi", alternativeApi ? "true" : "false");
-
+	
 	apiUrl = alternativeApi ? ALTERNATIVE_API_URL : DEFAULT_API_URL;
-
+	
 	showError("API Key saved!");
 	setTimeout(() => showError(""), 2000);
 }
@@ -1001,24 +708,61 @@ async function refresh() {
 }
 
 function startAutoRefresh() {
-	// Clear any existing timer
-	if (autoRefreshTimer) {
-		clearInterval(autoRefreshTimer);
+	stopAutoRefresh();
+	
+	const autoRefresh = document.getElementById("autoRefresh").checked;
+	const interval = parseInt(document.getElementById("refreshInterval").value) || 10;
+	
+	if (autoRefresh) {
+		const apiKey = localStorage.getItem("apiKey");
+		const userId = localStorage.getItem("userId");
+		
+		if (!apiKey || !userId) {
+			showError("Please enter API Key and User ID for auto refresh");
+			document.getElementById("autoRefresh").checked = false;
+			return;
+		}
+		
+		// Fetch immediately when auto-refresh is enabled
+		fetchStorages().catch(error => {
+			console.error("Auto refresh initial fetch error:", error);
+		});
+		
+		// Then set up interval to fetch API data periodically
+		autoRefreshInterval = setInterval(async () => {
+			try {
+				await fetchStorages();
+			} catch (error) {
+				console.error("Auto refresh error:", error);
+				stopAutoRefresh();
+				document.getElementById("autoRefresh").checked = false;
+				saveAutoRefreshSettings();
+			}
+		}, interval * 1000);
 	}
-
-	// Start polling every 5 seconds
-	autoRefreshTimer = setInterval(() => {
-		silentRefreshStorages();
-	}, 5000); // 5 seconds
-
-	console.log("✓ Auto-refresh enabled (polling every 5 seconds)");
 }
 
 function stopAutoRefresh() {
-	if (autoRefreshTimer) {
-		clearInterval(autoRefreshTimer);
-		autoRefreshTimer = null;
-		console.log("✓ Auto-refresh disabled");
+	if (autoRefreshInterval) {
+		clearInterval(autoRefreshInterval);
+		autoRefreshInterval = null;
+	}
+}
+
+function saveAutoRefreshSettings() {
+	localStorage.setItem("autoRefresh", document.getElementById("autoRefresh").checked ? "true" : "false");
+	localStorage.setItem("refreshInterval", document.getElementById("refreshInterval").value);
+}
+
+function loadAutoRefreshSettings() {
+	const savedAutoRefresh = localStorage.getItem("autoRefresh") === "true";
+	const savedInterval = localStorage.getItem("refreshInterval") || "10";
+	
+	document.getElementById("autoRefresh").checked = savedAutoRefresh;
+	document.getElementById("refreshInterval").value = savedInterval;
+	
+	if (savedAutoRefresh) {
+		startAutoRefresh();
 	}
 }
 
@@ -1031,7 +775,6 @@ function saveSettings() {
 	localStorage.setItem("trailer", document.getElementById("trailer").value);
 	localStorage.setItem("postop", document.getElementById("postop").checked ? "true" : "false");
 	localStorage.setItem("premium", document.getElementById("premium").checked ? "true" : "false");
-	localStorage.setItem("autoRefresh", document.getElementById("autoRefresh").checked ? "true" : "false");
 	localStorage.setItem("sourceStorage", document.getElementById("sourceStorage").value);
 	localStorage.setItem("destinationStorage", document.getElementById("destinationStorage").value);
 }
@@ -1043,7 +786,7 @@ function loadSettings() {
 	const savedPremium = localStorage.getItem("premium") === "true";
 	const savedSourceStorage = localStorage.getItem("sourceStorage") || "";
 	const savedDestinationStorage = localStorage.getItem("destinationStorage") || "";
-
+	
 	document.getElementById("mk15").checked = savedMk15;
 	document.getElementById("trailer").value = savedTrailer;
 	document.getElementById("postop").checked = savedPostop;
@@ -1054,64 +797,65 @@ function loadSettings() {
 
 function setupEventListeners() {
 	// Calculate on input changes
-	document.getElementById("mk15").addEventListener("change", function () {
+	document.getElementById("mk15").addEventListener("change", function() {
 		saveSettings();
 		calculateRuns();
 	});
-
-	document.getElementById("trailer").addEventListener("change", function () {
+	
+	document.getElementById("trailer").addEventListener("change", function() {
 		saveSettings();
 		calculateRuns();
 	});
-
-	document.getElementById("postop").addEventListener("change", function () {
+	
+	document.getElementById("postop").addEventListener("change", function() {
 		saveSettings();
 		calculateRuns();
 	});
-
-	document.getElementById("premium").addEventListener("change", function () {
+	
+	document.getElementById("premium").addEventListener("change", function() {
 		saveSettings();
 		calculateRuns();
 	});
-
-	document.getElementById("sourceStorage").addEventListener("change", function () {
+	
+	document.getElementById("sourceStorage").addEventListener("change", function() {
 		saveSettings();
-
+		updateAmountFromStorage();
 		// Force recalculation when storage changes
 		renderSelectedItems();
 		calculateRuns();
 	});
-
-
-	document.getElementById("destinationStorage").addEventListener("change", function () {
+	
+	
+	document.getElementById("destinationStorage").addEventListener("change", function() {
 		saveSettings();
 		calculateRuns();
 	});
-
-	document.getElementById("itemType").addEventListener("change", function () {
-
+	
+	document.getElementById("itemType").addEventListener("change", function() {
+		updateAmountFromStorage();
 		renderSelectedItems(); // Re-render to update remaining counts
 		calculateRuns();
 	});
-
-	document.getElementById("itemAmount").addEventListener("input", function () {
+	
+	document.getElementById("itemAmount").addEventListener("input", function() {
 		calculateRuns();
 	});
-
+	
 	// Mini mode and opacity
-	document.getElementById("miniMode").addEventListener("change", function () {
+	document.getElementById("miniMode").addEventListener("change", function() {
 		toggleMiniModeUI(this.checked);
 		localStorage.setItem("miniMode", this.checked ? "true" : "false");
 	});
-
-	// Auto-refresh toggle
-	document.getElementById("autoRefresh").addEventListener("change", function () {
-		saveSettings();
-		if (this.checked) {
-			startAutoRefresh();
-		} else {
-			stopAutoRefresh();
-		}
+	
+	// Auto refresh
+	document.getElementById("autoRefresh").addEventListener("change", function() {
+		saveAutoRefreshSettings();
+		startAutoRefresh();
+	});
+	
+	document.getElementById("refreshInterval").addEventListener("change", function() {
+		saveAutoRefreshSettings();
+		startAutoRefresh();
 	});
 }
 
@@ -1142,14 +886,14 @@ function toggleMiniModeUI(enabled) {
 }
 
 // Initialize
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", function() {
 	// Load saved API key and user ID
 	const savedApiKey = localStorage.getItem("apiKey");
 	const savedUserId = localStorage.getItem("userId");
 	const savedAlternativeApi = localStorage.getItem("alternativeApi") === "true";
 	const savedMiniMode = localStorage.getItem("miniMode") === "true";
 	const savedOpacity = localStorage.getItem("panelOpacity");
-
+	
 	if (savedApiKey) document.getElementById("apiKey").value = savedApiKey;
 	if (savedUserId) document.getElementById("userId").value = savedUserId;
 	if (savedAlternativeApi) {
@@ -1166,23 +910,26 @@ document.addEventListener("DOMContentLoaded", function () {
 		const userInput = document.getElementById("main").querySelector(".user-input");
 		userInput.style.opacity = opacity;
 	}
-
+	
 	populateItemDropdown();
 	setupEventListeners();
 	initDragging();
 	loadSelectedItems();
-
+	
 	// Load settings after everything is set up
 	loadSettings();
-
+	
 	// Panel opacity listener
-	document.getElementById("panelOpacity").addEventListener("input", function () {
+	document.getElementById("panelOpacity").addEventListener("input", function() {
 		const userInput = document.getElementById("main").querySelector(".user-input");
 		const opacity = parseFloat(this.value);
 		userInput.style.opacity = opacity;
 		localStorage.setItem("panelOpacity", opacity.toString());
 	});
-
+	
+	// Load auto refresh settings
+	loadAutoRefreshSettings();
+	
 	// Load storages if API key exists
 	if (savedApiKey && savedUserId) {
 		fetchStorages().then(() => {
@@ -1199,169 +946,4 @@ document.addEventListener("DOMContentLoaded", function () {
 		loadSettings();
 		calculateRuns();
 	}
-
-	// Listen for ALL FiveM messages and update storage data in real-time
-	window.addEventListener("message", function (event) {
-		if (!event.data || typeof event.data !== 'object') return;
-
-		const data = event.data;
-		let storageUpdated = false;
-
-		// FiveM sends data as flat key-value pairs
-		// Look for chest_ keys which contain storage inventory
-		for (const key in data) {
-			if (key.startsWith("chest_")) {
-				try {
-					// Parse the chest data
-					let chestInventory = data[key];
-					if (typeof chestInventory === 'string') {
-						chestInventory = JSON.parse(chestInventory);
-					}
-
-					// Update our storage data with this chest's inventory
-					if (chestInventory && typeof chestInventory === 'object') {
-						// Find matching storage and update item amounts
-						storages.forEach(storage => {
-							if (storage && storage.items) {
-								storage.items.forEach(storageItem => {
-									if (storageItem.item) {
-										const itemName = storageItem.item.name;
-										const itemId = storageItem.item.id;
-
-										// Check if this item is in the chest data
-										if (chestInventory[itemName] !== undefined) {
-											const newAmount = parseInt(chestInventory[itemName]) || 0;
-											if (storageItem.amount !== newAmount) {
-												storageItem.amount = newAmount;
-												storageUpdated = true;
-											}
-										} else if (chestInventory[itemId] !== undefined) {
-											const newAmount = parseInt(chestInventory[itemId]) || 0;
-											if (storageItem.amount !== newAmount) {
-												storageItem.amount = newAmount;
-												storageUpdated = true;
-											}
-										}
-									}
-								});
-							}
-						});
-					}
-				} catch (e) {
-					// Ignore parse errors
-				}
-			}
-		}
-
-		// If storage was updated, refresh the UI
-		if (storageUpdated) {
-			renderSelectedItems();
-			calculateRuns();
-			console.log("✅ Storage updated from FiveM (no API charge)");
-		}
-	});
-
-	console.log("✓ Runs Calculator initialized");
-	console.log("ℹ️ Auto-refresh enabled at 1 second (uses cache - minimal API charges)");
-
-	// Automatic refresh functionality
-	let autoRefreshInterval = null;
-
-	function getRefreshInterval() {
-		const intervalSelect = document.getElementById('refreshInterval');
-		return intervalSelect ? parseInt(intervalSelect.value) : 30000;
-	}
-
-	function startAutoRefresh() {
-		if (autoRefreshInterval) {
-			clearInterval(autoRefreshInterval);
-		}
-
-		const interval = getRefreshInterval();
-		console.log(`🔄 Auto-refresh enabled - polling API every ${interval / 1000} seconds`);
-
-		// Refresh immediately
-		silentRefreshStorages();
-
-		// Then refresh at selected interval
-		autoRefreshInterval = setInterval(() => {
-			silentRefreshStorages();
-		}, interval);
-	}
-
-	function stopAutoRefresh() {
-		if (autoRefreshInterval) {
-			clearInterval(autoRefreshInterval);
-			autoRefreshInterval = null;
-			console.log("⏸️ Auto-refresh disabled");
-		}
-	}
-
-	// Auto-refresh toggle handler
-	const autoRefreshCheckbox = document.getElementById('autoRefresh');
-	const refreshIntervalSelect = document.getElementById('refreshInterval');
-
-	if (autoRefreshCheckbox) {
-		autoRefreshCheckbox.addEventListener('change', function () {
-			if (this.checked) {
-				startAutoRefresh();
-			} else {
-				stopAutoRefresh();
-			}
-		});
-
-		// Start if checked by default
-		if (autoRefreshCheckbox.checked) {
-			startAutoRefresh();
-		}
-	}
-
-	// Restart auto-refresh when interval changes
-	if (refreshIntervalSelect) {
-		refreshIntervalSelect.addEventListener('change', function () {
-			if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
-				startAutoRefresh(); // Restart with new interval
-			}
-		});
-	}
-
-	console.log("✓ Runs Calculator initialized");
-	console.log("ℹ️ Storage data comes from API - click 'Fetch Storages' to update");
-
-	// Console toggle
-	const showConsoleCheckbox = document.getElementById('showConsole');
-	const debugConsole = document.getElementById('debug-console');
-	if (showConsoleCheckbox && debugConsole) {
-		showConsoleCheckbox.addEventListener('change', function () {
-			debugConsole.style.display = this.checked ? 'block' : 'none';
-		});
-
-		// Make console draggable
-		const consoleHeader = debugConsole.querySelector('.console-header');
-		let isDragging = false;
-		let currentX, currentY, initialX, initialY;
-
-		consoleHeader.addEventListener('mousedown', function (e) {
-			isDragging = true;
-			initialX = e.clientX - debugConsole.offsetLeft;
-			initialY = e.clientY - debugConsole.offsetTop;
-		});
-
-		document.addEventListener('mousemove', function (e) {
-			if (isDragging) {
-				e.preventDefault();
-				currentX = e.clientX - initialX;
-				currentY = e.clientY - initialY;
-				debugConsole.style.left = currentX + 'px';
-				debugConsole.style.top = currentY + 'px';
-				debugConsole.style.bottom = 'auto';
-			}
-		});
-
-		document.addEventListener('mouseup', function () {
-			isDragging = false;
-		});
-	}
-
-	console.log("✓ Runs Calculator initialized - listening for FiveM storage updates");
 });
