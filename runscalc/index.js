@@ -213,6 +213,21 @@ function updateStorageFromMessage(messageData) {
 
 	// Refresh UI to show updated amounts
 	populateStorageDropdowns();
+	
+	// Verify and fix originalAmount for any items that might be missing it
+	selectedItems.forEach(item => {
+		if (!item.originalAmount) {
+			const currentInStorage = getRemainingInStorage(item.itemId);
+			if (currentInStorage !== null) {
+				item.originalAmount = Math.max(item.amount, currentInStorage);
+				console.log(`🔧 Fixed missing originalAmount for ${item.itemId}: ${item.originalAmount}`);
+			}
+		}
+	});
+	if (selectedItems.some(item => !item.originalAmount)) {
+		saveSelectedItems(); // Save any fixes
+	}
+	
 	renderSelectedItems(); // This will update "items left" counts
 	calculateRuns(); // This will recalculate runs with new amounts
 
@@ -393,16 +408,18 @@ function addItem() {
 	}
 
 	// Add new item - store ORIGINAL storage amount for tracking
+	// IMPORTANT: originalAmount should NEVER be changed after this point
 	selectedItems.push({
 		itemId: itemType,
 		amount: amountToTrack, // How much user wants to move
-		originalAmount: currentInStorage // Original amount in storage (for tracking changes)
+		originalAmount: currentInStorage // Original amount in storage when item was added (NEVER CHANGE THIS)
 	});
 
+	saveSelectedItems(); // Save immediately to preserve originalAmount
 	renderSelectedItems();
 	document.getElementById("itemAmount").value = 0; // Reset input
 	showError("");
-	console.log(`✓ Tracking ${ITEM_WEIGHTS[itemType]?.name}: ${amountToTrack} to move (${currentInStorage} in storage)`);
+	console.log(`✓ Tracking ${ITEM_WEIGHTS[itemType]?.name}: ${amountToTrack} to move, originalAmount=${currentInStorage} (saved to localStorage)`);
 }
 
 function removeItem(index) {
@@ -415,10 +432,15 @@ function updateSelectedItemAmount(index, newAmount) {
 	const amount = parseInt(newAmount) || 0;
 	if (amount < 0) return;
 
-	selectedItems[index].amount = amount;
+	// Update amount but NEVER change originalAmount
+	const item = selectedItems[index];
+	if (!item) return;
+	
+	item.amount = amount;
+	// originalAmount should remain unchanged - it's the baseline for tracking
 	saveSelectedItems();
 	calculateRuns(); // Recalculate with new amount
-	console.log(`✏️ Updated amount to ${amount}`);
+	console.log(`✏️ Updated amount to ${amount} (originalAmount=${item.originalAmount} preserved)`);
 }
 
 function getRemainingInStorage(itemId) {
@@ -459,7 +481,16 @@ function renderSelectedItems() {
 		if (!itemData) return;
 
 		const currentInStorage = getRemainingInStorage(item.itemId);
-		const originalAmount = item.originalAmount || item.amount;
+		
+		// Ensure originalAmount exists - if not, use item.amount as fallback
+		// But log a warning since this shouldn't happen if items were added correctly
+		if (!item.originalAmount) {
+			console.warn(`⚠️ ${itemData.name} missing originalAmount! Using item.amount=${item.amount} as fallback`);
+			item.originalAmount = item.amount;
+			saveSelectedItems(); // Save the fixed originalAmount
+		}
+		
+		const originalAmount = item.originalAmount;
 
 		// Auto-remove if storage is empty (all items moved)
 		if (currentInStorage !== null && currentInStorage === 0) {
@@ -470,11 +501,12 @@ function renderSelectedItems() {
 
 		// Calculate how many were moved (original - current)
 		// Handle case where items might be added back (current > original)
-		const movedAmount = currentInStorage !== null 
-			? Math.max(0, originalAmount - currentInStorage) 
-			: 0;
+		let movedAmount = 0;
+		if (currentInStorage !== null && originalAmount !== null) {
+			movedAmount = Math.max(0, originalAmount - currentInStorage);
+		}
 
-		console.log(`📊 ${itemData.name}: original=${originalAmount}, current=${currentInStorage}, moved=${movedAmount}`);
+		console.log(`📊 ${itemData.name}: originalAmount=${originalAmount}, currentInStorage=${currentInStorage}, moved=${movedAmount}, item.amount=${item.amount}`);
 
 		const storageText = currentInStorage !== null
 			? ` <span style="color: #888; font-size: 0.85em;">(${currentInStorage.toLocaleString()} in storage, ${movedAmount > 0 ? movedAmount.toLocaleString() + ' moved' : 'none moved'})</span>`
@@ -536,9 +568,25 @@ function loadSelectedItems() {
 			// Initialize originalAmount for items that don't have it (backward compatibility)
 			selectedItems.forEach(item => {
 				if (!item.originalAmount) {
-					// Try to get current storage amount as fallback
+					// Try to get current storage amount first
 					const currentInStorage = getRemainingInStorage(item.itemId);
-					item.originalAmount = currentInStorage !== null ? currentInStorage : item.amount;
+					
+					// If storage data is available and current < item.amount, items were moved
+					// In this case, item.amount was likely the original amount
+					// If current >= item.amount, use current as original (items might have been added)
+					if (currentInStorage !== null) {
+						// Use the larger of item.amount or currentInStorage as original
+						// This handles both cases: items moved (current < item.amount) or items added (current >= item.amount)
+						item.originalAmount = Math.max(item.amount, currentInStorage);
+						console.log(`⚠️ Restored originalAmount for ${item.itemId}: ${item.originalAmount} (current=${currentInStorage}, item.amount=${item.amount})`);
+					} else {
+						// Storage data not available yet, use item.amount as fallback
+						item.originalAmount = item.amount;
+						console.log(`⚠️ Restored originalAmount for ${item.itemId}: ${item.originalAmount} (from item.amount, storage data not available)`);
+					}
+					
+					// Save the fixed originalAmount
+					saveSelectedItems();
 				}
 			});
 			
