@@ -168,6 +168,13 @@ console.warn = function (...args) {
 
 // Real-time storage update handler
 function updateStorageFromMessage(messageData) {
+	// Check if useItems is enabled - if not, ignore FiveM messages (use API instead)
+	const useItems = document.getElementById("useItems")?.checked ?? true;
+	if (!useItems) {
+		console.log("ℹ️ Storage update from FiveM ignored (useItems disabled, using API mode)");
+		return;
+	}
+
 	console.log("📨 Received storage update message:", messageData);
 
 	// Handle different message formats from FiveM
@@ -215,23 +222,23 @@ function updateStorageFromMessage(messageData) {
 	populateStorageDropdowns();
 	
 	// Verify and fix originalAmount for any items that might be missing it
+	// IMPORTANT: Never change originalAmount if it already exists - it's the baseline!
 	selectedItems.forEach(item => {
 		if (!item.originalAmount) {
 			const currentInStorage = getRemainingInStorage(item.itemId);
 			if (currentInStorage !== null) {
+				// Use the larger value to ensure we don't undercount moved items
 				item.originalAmount = Math.max(item.amount, currentInStorage);
 				console.log(`🔧 Fixed missing originalAmount for ${item.itemId}: ${item.originalAmount}`);
+				saveSelectedItems(); // Save immediately
 			}
 		}
 	});
-	if (selectedItems.some(item => !item.originalAmount)) {
-		saveSelectedItems(); // Save any fixes
-	}
 	
 	renderSelectedItems(); // This will update "items left" counts
 	calculateRuns(); // This will recalculate runs with new amounts
 
-	console.log("✓ Storage data updated, UI refreshed");
+	console.log("✅ Storage data updated from FiveM (no API charge, useItems enabled)");
 }
 
 function toggleSettings() {
@@ -409,17 +416,19 @@ function addItem() {
 
 	// Add new item - store ORIGINAL storage amount for tracking
 	// IMPORTANT: originalAmount should NEVER be changed after this point
+	// originalAmount = what was ACTUALLY in storage when item was added (for tracking moves)
+	// amount = how much user wants to move (can be different from originalAmount)
 	selectedItems.push({
 		itemId: itemType,
-		amount: amountToTrack, // How much user wants to move
-		originalAmount: currentInStorage // Original amount in storage when item was added (NEVER CHANGE THIS)
+		amount: amountToTrack, // How much user wants to move (target)
+		originalAmount: currentInStorage // ACTUAL amount in storage when added (baseline for tracking)
 	});
 
 	saveSelectedItems(); // Save immediately to preserve originalAmount
 	renderSelectedItems();
 	document.getElementById("itemAmount").value = 0; // Reset input
 	showError("");
-	console.log(`✓ Tracking ${ITEM_WEIGHTS[itemType]?.name}: ${amountToTrack} to move, originalAmount=${currentInStorage} (saved to localStorage)`);
+	console.log(`✓ Tracking ${ITEM_WEIGHTS[itemType]?.name}: amount=${amountToTrack} to move, originalAmount=${currentInStorage} (baseline for tracking moves)`);
 }
 
 function removeItem(index) {
@@ -482,12 +491,20 @@ function renderSelectedItems() {
 
 		const currentInStorage = getRemainingInStorage(item.itemId);
 		
-		// Ensure originalAmount exists - if not, use item.amount as fallback
-		// But log a warning since this shouldn't happen if items were added correctly
+		// Ensure originalAmount exists - if not, set it based on current storage
+		// This handles items loaded from localStorage that might not have originalAmount
 		if (!item.originalAmount) {
-			console.warn(`⚠️ ${itemData.name} missing originalAmount! Using item.amount=${item.amount} as fallback`);
-			item.originalAmount = item.amount;
-			saveSelectedItems(); // Save the fixed originalAmount
+			if (currentInStorage !== null) {
+				// If we have current storage, use the larger of item.amount or currentInStorage
+				// This ensures we don't undercount moved items
+				item.originalAmount = Math.max(item.amount, currentInStorage);
+				console.warn(`⚠️ ${itemData.name} missing originalAmount! Set to ${item.originalAmount} (item.amount=${item.amount}, current=${currentInStorage})`);
+				saveSelectedItems(); // Save the fixed originalAmount
+			} else {
+				// No storage data available, use item.amount as fallback
+				item.originalAmount = item.amount;
+				console.warn(`⚠️ ${itemData.name} missing originalAmount! Using item.amount=${item.amount} as fallback (storage data unavailable)`);
+			}
 		}
 		
 		const originalAmount = item.originalAmount;
@@ -502,7 +519,8 @@ function renderSelectedItems() {
 		// Calculate how many were moved (original - current)
 		// Handle case where items might be added back (current > original)
 		let movedAmount = 0;
-		if (currentInStorage !== null && originalAmount !== null) {
+		if (currentInStorage !== null && originalAmount !== null && originalAmount !== undefined) {
+			// movedAmount = how much was in storage originally - how much is there now
 			movedAmount = Math.max(0, originalAmount - currentInStorage);
 		}
 
@@ -855,7 +873,15 @@ async function fetchStorages() {
 }
 
 // Update storage from FiveM chest data (NO API CALLS!)
+// This works independently of auto-refresh - processes FiveM messages in real-time
 function updateStorageFromChest(chestId, chestData) {
+	// Check if useItems is enabled - if not, ignore FiveM messages (use API instead)
+	const useItems = document.getElementById("useItems")?.checked ?? true;
+	if (!useItems) {
+		console.log("ℹ️ Chest update from FiveM ignored (useItems disabled, using API mode)");
+		return;
+	}
+
 	console.log(`📦 Processing chest data for: ${chestId}`, chestData);
 
 	const userId = localStorage.getItem("userId");
@@ -911,6 +937,17 @@ function updateStorageFromChest(chestId, chestData) {
 
 // Silent refresh for auto-polling (ALWAYS fetches fresh data)
 async function silentRefreshStorages() {
+	// Check if useItems is enabled - if so, don't call API, only use FiveM messages
+	const useItems = document.getElementById("useItems")?.checked ?? true;
+	if (useItems) {
+		// When useItems is checked, we rely on FiveM messages for updates (no API charge)
+		// Just refresh the UI with current data
+		renderSelectedItems();
+		calculateRuns();
+		return;
+	}
+
+	// Only call API if useItems is disabled
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
 
@@ -1103,6 +1140,7 @@ function saveSettings() {
 	localStorage.setItem("trailer", document.getElementById("trailer").value);
 	localStorage.setItem("postop", document.getElementById("postop").checked ? "true" : "false");
 	localStorage.setItem("premium", document.getElementById("premium").checked ? "true" : "false");
+	localStorage.setItem("useItems", document.getElementById("useItems")?.checked !== false ? "true" : "false");
 	localStorage.setItem("autoRefresh", document.getElementById("autoRefresh").checked ? "true" : "false");
 	localStorage.setItem("sourceStorage", document.getElementById("sourceStorage").value);
 	localStorage.setItem("destinationStorage", document.getElementById("destinationStorage").value);
@@ -1113,6 +1151,7 @@ function loadSettings() {
 	const savedTrailer = localStorage.getItem("trailer") || "";
 	const savedPostop = localStorage.getItem("postop") === "true";
 	const savedPremium = localStorage.getItem("premium") === "true";
+	const savedUseItems = localStorage.getItem("useItems") !== "false"; // Default to true
 	const savedSourceStorage = localStorage.getItem("sourceStorage") || "";
 	const savedDestinationStorage = localStorage.getItem("destinationStorage") || "";
 
@@ -1120,6 +1159,9 @@ function loadSettings() {
 	document.getElementById("trailer").value = savedTrailer;
 	document.getElementById("postop").checked = savedPostop;
 	document.getElementById("premium").checked = savedPremium;
+	if (document.getElementById("useItems")) {
+		document.getElementById("useItems").checked = savedUseItems;
+	}
 	document.getElementById("sourceStorage").value = savedSourceStorage;
 	document.getElementById("destinationStorage").value = savedDestinationStorage;
 }
@@ -1175,6 +1217,14 @@ function setupEventListeners() {
 		toggleMiniModeUI(this.checked);
 		localStorage.setItem("miniMode", this.checked ? "true" : "false");
 	});
+	
+	// Use Items checkbox - controls whether to use FiveM messages (no API charge) or API calls
+	if (document.getElementById("useItems")) {
+		document.getElementById("useItems").addEventListener("change", function () {
+			saveSettings();
+			console.log(`✓ Use Items: ${this.checked ? "enabled (using FiveM data, no API charge)" : "disabled (using API calls)"}`);
+		});
+	}
 
 	// Auto-refresh toggle
 	document.getElementById("autoRefresh").addEventListener("change", function () {
@@ -1273,8 +1323,17 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	// Listen for ALL FiveM messages and update storage data in real-time
+	// useItems checkbox controls whether to use these messages (no API charge)
+	// This works INDEPENDENTLY of auto-refresh - messages come in real-time from FiveM
 	window.addEventListener("message", function (event) {
 		if (!event.data || typeof event.data !== 'object') return;
+
+		// Check if useItems is enabled - if not, ignore FiveM messages (will use API instead)
+		const useItemsEnabled = document.getElementById("useItems")?.checked ?? true;
+		if (!useItemsEnabled) {
+			// useItems disabled - ignore FiveM messages, will use API calls instead
+			return;
+		}
 
 		const data = event.data;
 		let storageUpdated = false;
@@ -1299,20 +1358,20 @@ document.addEventListener("DOMContentLoaded", function () {
 									if (storageItem.item) {
 										const itemName = storageItem.item.name;
 										const itemId = storageItem.item.id;
+										const oldAmount = storageItem.amount;
 
 										// Check if this item is in the chest data
+										let newAmount = null;
 										if (chestInventory[itemName] !== undefined) {
-											const newAmount = parseInt(chestInventory[itemName]) || 0;
-											if (storageItem.amount !== newAmount) {
-												storageItem.amount = newAmount;
-												storageUpdated = true;
-											}
+											newAmount = parseInt(chestInventory[itemName]) || 0;
 										} else if (chestInventory[itemId] !== undefined) {
-											const newAmount = parseInt(chestInventory[itemId]) || 0;
-											if (storageItem.amount !== newAmount) {
-												storageItem.amount = newAmount;
-												storageUpdated = true;
-											}
+											newAmount = parseInt(chestInventory[itemId]) || 0;
+										}
+
+										if (newAmount !== null && oldAmount !== newAmount) {
+											console.log(`📦 ${itemName}: ${oldAmount} → ${newAmount} (from FiveM)`);
+											storageItem.amount = newAmount;
+											storageUpdated = true;
 										}
 									}
 								});
@@ -1325,11 +1384,26 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		}
 
-		// If storage was updated, refresh the UI
+		// If storage was updated, refresh the UI immediately
+		// This works independently of auto-refresh - FiveM messages update in real-time
 		if (storageUpdated) {
+			// Verify and preserve originalAmount when storage updates
+			selectedItems.forEach(item => {
+				// originalAmount should never change - it's the baseline
+				// Only set it if it's missing
+				if (!item.originalAmount) {
+					const currentInStorage = getRemainingInStorage(item.itemId);
+					if (currentInStorage !== null) {
+						// Use the larger value to ensure we don't undercount moved items
+						item.originalAmount = Math.max(item.amount, currentInStorage);
+						console.log(`🔧 Fixed missing originalAmount for ${item.itemId}: ${item.originalAmount}`);
+					}
+				}
+			});
+			
 			renderSelectedItems();
 			calculateRuns();
-			console.log("✅ Storage updated from FiveM (no API charge)");
+			console.log("✅ Storage updated from FiveM (no API charge, useItems enabled)");
 		}
 	});
 
