@@ -101,7 +101,7 @@ let selectedItems = [];
 const DEFAULT_API_URL = "https://tycoon-2epova.users.cfx.re/status/";
 const ALTERNATIVE_API_URL = "https://d.ttstats.eu/public-main/status/";
 let apiUrl = DEFAULT_API_URL;
-let autoRefreshTimer = null;
+// Auto-refresh is event-driven (like Dogg's), not polling-based
 
 // In-app console logging
 const originalConsoleLog = console.log;
@@ -801,7 +801,7 @@ async function apiFetch(endpoint, apiKey) {
 	return response.json();
 }
 
-async function fetchStorages() {
+async function fetchStorages(forceRefresh = false) {
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
 
@@ -810,14 +810,14 @@ async function fetchStorages() {
 		return;
 	}
 
-	// Check if we have cached data
+	// Check if we have cached data (only if not forcing refresh)
 	const cacheKey = `storages_${userId}`;
 	const cachedData = localStorage.getItem(cacheKey);
 	const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
 
-	// Use cached data if it exists and is less than 5 minutes old
+	// Use cached data if it exists and is less than 5 minutes old (and not forcing refresh)
 	const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-	if (cachedData && cacheTimestamp) {
+	if (!forceRefresh && cachedData && cacheTimestamp) {
 		const age = Date.now() - parseInt(cacheTimestamp);
 		if (age < CACHE_DURATION) {
 			console.log("📦 Using cached storage data (no API charge!)");
@@ -837,7 +837,15 @@ async function fetchStorages() {
 				return;
 			} catch (e) {
 				console.warn("Failed to load cache, fetching from API");
+				// Clear corrupted cache
+				localStorage.removeItem(cacheKey);
+				localStorage.removeItem(`${cacheKey}_timestamp`);
 			}
+		} else {
+			// Cache expired, clear it
+			console.log("⏰ Cache expired, fetching fresh data");
+			localStorage.removeItem(cacheKey);
+			localStorage.removeItem(`${cacheKey}_timestamp`);
 		}
 	}
 
@@ -935,39 +943,8 @@ function updateStorageFromChest(chestId, chestData) {
 	}
 }
 
-// Silent refresh for auto-polling (ALWAYS fetches fresh data)
-async function silentRefreshStorages() {
-	// Check if useItems is enabled - if so, don't call API, only use FiveM messages
-	const useItems = document.getElementById("useItems")?.checked ?? true;
-	if (useItems) {
-		// When useItems is checked, we rely on FiveM messages for updates (no API charge)
-		// Just refresh the UI with current data
-		renderSelectedItems();
-		calculateRuns();
-		return;
-	}
-
-	// Only call API if useItems is disabled
-	const apiKey = localStorage.getItem("apiKey");
-	const userId = localStorage.getItem("userId");
-
-	if (!apiKey || !userId) return;
-
-	try {
-		const data = await apiFetch(`storages/${userId}`, apiKey);
-		const storageList = data.storages || [];
-
-		storages = storageList.map(storage => {
-			const parsed = parseStorage(storage.name, storage.inventory || {}, userId);
-			return parsed;
-		}).filter(s => s !== null);
-
-		renderSelectedItems();
-		calculateRuns();
-	} catch (error) {
-		console.error("Silent refresh failed:", error);
-	}
-}
+// Removed silentRefreshStorages - auto-refresh is now event-driven (like Dogg's)
+// It triggers recalculation when FiveM messages update storage, not polling
 
 
 function parseStorage(storageName, inventory, userId) {
@@ -1106,28 +1083,26 @@ function saveApiKey() {
 }
 
 async function refresh() {
-	await fetchStorages();
-}
-
-function startAutoRefresh() {
-	// Clear any existing timer
-	if (autoRefreshTimer) {
-		clearInterval(autoRefreshTimer);
+	// Manual refresh should ALWAYS fetch fresh data from API, bypassing cache
+	const userId = localStorage.getItem("userId");
+	if (userId) {
+		// Clear cache to force fresh fetch
+		const cacheKey = `storages_${userId}`;
+		localStorage.removeItem(cacheKey);
+		localStorage.removeItem(`${cacheKey}_timestamp`);
+		console.log("🔄 Manual refresh - clearing cache and fetching fresh data");
 	}
-
-	// Start polling every 5 seconds
-	autoRefreshTimer = setInterval(() => {
-		silentRefreshStorages();
-	}, 5000); // 5 seconds
-
-	console.log("✓ Auto-refresh enabled (polling every 5 seconds)");
+	await fetchStorages(true);
 }
 
-function stopAutoRefresh() {
-	if (autoRefreshTimer) {
-		clearInterval(autoRefreshTimer);
-		autoRefreshTimer = null;
-		console.log("✓ Auto-refresh disabled");
+// Auto-refresh in Dogg's style: triggers recalculation when storage updates from FiveM
+// Not a polling mechanism - event-driven based on FiveM messages
+function triggerAutoRefresh() {
+	const autoRefresh = document.getElementById("autoRefresh")?.checked ?? false;
+	if (autoRefresh) {
+		renderSelectedItems();
+		calculateRuns();
+		console.log("🔄 Auto-refresh triggered recalculation");
 	}
 }
 
@@ -1226,15 +1201,13 @@ function setupEventListeners() {
 		});
 	}
 
-	// Auto-refresh toggle
-	document.getElementById("autoRefresh").addEventListener("change", function () {
-		saveSettings();
-		if (this.checked) {
-			startAutoRefresh();
-		} else {
-			stopAutoRefresh();
-		}
-	});
+	// Auto-refresh toggle - event-driven (like Dogg's), not polling
+	if (document.getElementById("autoRefresh")) {
+		document.getElementById("autoRefresh").addEventListener("change", function () {
+			saveSettings();
+			console.log(`✓ Auto-refresh: ${this.checked ? "enabled (will recalculate on storage updates)" : "disabled"}`);
+		});
+	}
 }
 
 function toggleMiniMode() {
@@ -1384,8 +1357,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		}
 
-		// If storage was updated, refresh the UI immediately
-		// This works independently of auto-refresh - FiveM messages update in real-time
+		// If storage was updated, refresh the UI
+		// autoRefresh controls whether to automatically recalculate when storage updates
 		if (storageUpdated) {
 			// Verify and preserve originalAmount when storage updates
 			selectedItems.forEach(item => {
@@ -1401,78 +1374,24 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			});
 			
-			renderSelectedItems();
-			calculateRuns();
-			console.log("✅ Storage updated from FiveM (no API charge, useItems enabled)");
+			// Check if autoRefresh is enabled - if so, automatically recalculate
+			const autoRefresh = document.getElementById("autoRefresh")?.checked ?? false;
+			if (autoRefresh) {
+				renderSelectedItems();
+				calculateRuns();
+				console.log("✅ Storage updated from FiveM - auto-refresh recalculated (no API charge)");
+			} else {
+				// autoRefresh disabled - just update the data, don't recalculate
+				console.log("✅ Storage updated from FiveM (auto-refresh disabled, manual refresh needed)");
+			}
 		}
 	});
 
 	console.log("✓ Runs Calculator initialized");
 	console.log("ℹ️ Auto-refresh enabled at 1 second (uses cache - minimal API charges)");
 
-	// Automatic refresh functionality
-	let autoRefreshInterval = null;
-
-	function getRefreshInterval() {
-		const intervalSelect = document.getElementById('refreshInterval');
-		return intervalSelect ? parseInt(intervalSelect.value) : 30000;
-	}
-
-	function startAutoRefresh() {
-		if (autoRefreshInterval) {
-			clearInterval(autoRefreshInterval);
-		}
-
-		const interval = getRefreshInterval();
-		console.log(`🔄 Auto-refresh enabled - polling API every ${interval / 1000} seconds`);
-
-		// Refresh immediately
-		silentRefreshStorages();
-
-		// Then refresh at selected interval
-		autoRefreshInterval = setInterval(() => {
-			silentRefreshStorages();
-		}, interval);
-	}
-
-	function stopAutoRefresh() {
-		if (autoRefreshInterval) {
-			clearInterval(autoRefreshInterval);
-			autoRefreshInterval = null;
-			console.log("⏸️ Auto-refresh disabled");
-		}
-	}
-
-	// Auto-refresh toggle handler
-	const autoRefreshCheckbox = document.getElementById('autoRefresh');
-	const refreshIntervalSelect = document.getElementById('refreshInterval');
-
-	if (autoRefreshCheckbox) {
-		autoRefreshCheckbox.addEventListener('change', function () {
-			if (this.checked) {
-				startAutoRefresh();
-			} else {
-				stopAutoRefresh();
-			}
-		});
-
-		// Start if checked by default
-		if (autoRefreshCheckbox.checked) {
-			startAutoRefresh();
-		}
-	}
-
-	// Restart auto-refresh when interval changes
-	if (refreshIntervalSelect) {
-		refreshIntervalSelect.addEventListener('change', function () {
-			if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
-				startAutoRefresh(); // Restart with new interval
-			}
-		});
-	}
-
 	console.log("✓ Runs Calculator initialized");
-	console.log("ℹ️ Storage data comes from API - click 'Fetch Storages' to update");
+	console.log("ℹ️ Auto-refresh: When enabled, automatically recalculates when storage updates from FiveM");
 
 	// Console toggle
 	const showConsoleCheckbox = document.getElementById('showConsole');
