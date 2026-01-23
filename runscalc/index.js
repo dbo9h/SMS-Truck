@@ -103,6 +103,171 @@ const ALTERNATIVE_API_URL = "https://d.ttstats.eu/public-main/status/";
 let apiUrl = DEFAULT_API_URL;
 let autoRefreshTimer = null;
 
+// Runtime cache system (like Dogg)
+let runningInGame = false; // Detected when we get fromTycoonScript message
+let runtimeCache = {}; // Mutable runtime storage data (chest_*, inventory, backpack)
+let runtimeUserId = null;
+let runtimeFactionId = null;
+let storagesUpdatedSinceLastRefresh = false;
+let pendingRefresh = false;
+let refreshTimeout = null;
+const REFRESH_IMMEDIATE_DELAY = 100; // ms - debounce delay for updates
+
+// Listen for FiveM messages (same pattern as Dogg: event.data = { fromTycoonScript, data: {...} })
+window.addEventListener("message", ({ data }) => {
+	if (!data || typeof data !== "object" || data.fromTycoonScript !== true) return;
+
+	// Mark that we're running inside FiveM
+	if (!runningInGame) {
+		runningInGame = true;
+		console.log("🎮 Running in FiveM - runtime updates enabled (0 API charges)");
+	}
+
+	// Dogg stores payload in e.data; mirror that here
+	const payload = data.data && typeof data.data === "object" ? data.data : data;
+	if (!payload || typeof payload !== "object") return;
+
+	// Extract user/faction from runtime payload when available (like Dogg uses pkey + faction)
+	if (payload.pkey && !runtimeUserId) {
+		const parts = String(payload.pkey).split("_");
+		if (parts[0]) runtimeUserId = parts[0];
+	}
+	if (payload.faction != null && runtimeFactionId == null) {
+		runtimeFactionId = String(payload.faction);
+	}
+
+	// Update runtime cache with storage-related keys (chest_*, inventory, backpack)
+	for (const [key, value] of Object.entries(payload)) {
+		if ((key.startsWith("chest_") && key !== "chest") || key === "inventory" || key === "backpack") {
+			try {
+				let inventoryData = value;
+				if (typeof inventoryData === "string") {
+					inventoryData = inventoryData === "" ? {} : JSON.parse(inventoryData);
+				}
+
+				if (inventoryData && typeof inventoryData === "object") {
+					runtimeCache[key] = inventoryData;
+					storagesUpdatedSinceLastRefresh = true;
+					scheduleRuntimeRefresh();
+				}
+			} catch {
+				// Ignore malformed payloads
+			}
+		}
+	}
+});
+
+// Debounced refresh of storages from runtime cache (no API)
+function scheduleRuntimeRefresh() {
+	if (pendingRefresh) return;
+
+	pendingRefresh = true;
+
+	if (refreshTimeout) {
+		clearTimeout(refreshTimeout);
+	}
+
+	refreshTimeout = setTimeout(() => {
+		applyRuntimeCacheToStorages();
+		pendingRefresh = false;
+		storagesUpdatedSinceLastRefresh = false;
+	}, REFRESH_IMMEDIATE_DELAY);
+}
+
+// Apply runtime cache to current storages and recalc UI
+function applyRuntimeCacheToStorages() {
+	if (!runningInGame || Object.keys(runtimeCache).length === 0) return;
+
+	let updated = false;
+
+	// Update storages ONLY from the matching chest key (prevents cross-storage corruption like the “524” bug)
+	for (const chestKey in runtimeCache) {
+		const chestData = runtimeCache[chestKey];
+		if (!chestData || typeof chestData !== "object") continue;
+
+		const storageId = getStorageIdFromChestKey(chestKey, runtimeUserId, runtimeFactionId);
+		if (!storageId) continue;
+
+		const storageMeta = getStorageById(storageId) || {
+			name: storageId,
+			id: storageId,
+			type: "storage"
+		};
+
+		const parsedItems = Object.entries(chestData)
+			.map(([rawItemId, itemData]) => {
+				const amount = typeof itemData === "object" && itemData !== null ? itemData.amount : itemData;
+				const cleanItemId = String(rawItemId).replace(/(<.+?>)|(&#.+?;)/g, "");
+				const item = ITEM_WEIGHTS[cleanItemId];
+				if (!item) return null;
+				return {
+					item: { id: cleanItemId, name: item.name, weight: item.weight },
+					amount: parseInt(amount) || 0
+				};
+			})
+			.filter(i => i && i.amount > 0);
+
+		const existingIndex = storages.findIndex(s => s && s.storage && s.storage.id === storageMeta.id);
+		if (existingIndex >= 0) {
+			storages[existingIndex] = { storage: storageMeta, items: parsedItems };
+		} else {
+			storages.push({ storage: storageMeta, items: parsedItems });
+		}
+		updated = true;
+	}
+
+	if (updated) {
+		populateStorageDropdowns();
+
+		// Auto-select a source storage if none is chosen yet (keeps UI from resetting to defaults)
+		const sourceSelect = document.getElementById("sourceStorage");
+		if (sourceSelect && !sourceSelect.value && storages.length > 0) {
+			sourceSelect.value = storages[0].storage.id;
+			saveSettings();
+		}
+
+		renderSelectedItems();
+		calculateRuns();
+		console.log("✅ Runtime storage update applied (0 API charges)");
+	}
+}
+
+function getStorageIdFromChestKey(chestKey, userIdParam, factionIdParam) {
+	if (!chestKey) return null;
+	let key = String(chestKey);
+	if (key.startsWith("chest_")) key = key.slice("chest_".length);
+
+	// chest_u{userId}*
+	if (key.startsWith("u")) {
+		// key like: u123_biz_train / u123_biz_train_chest / etc
+		key = key.replace(/^u\d+/, "");
+		key = key.replace(/^_/, "");
+	}
+
+	// chest_self_storage:{userId}:{id}:chest
+	// (sometimes comes without chest_ prefix)
+	const selfMatch = key.match(/^self_storage:(\d+):(.+):chest$/);
+	if (selfMatch) {
+		key = selfMatch[2] || "";
+	}
+
+	// Some servers may send raw chest_u123_* without chest_ prefix
+	key = key.replace(/^chest_u\d+/, "").replace(/^_/, "");
+	key = key.replace(/^chest_self_storage:\d+:(.+):chest$/, "$1").replace(/^_/, "");
+
+	// Vehicle storages: veh_*_{id}
+	const vehicleMatch = key.match(/^veh_\w+_(.+)$/);
+	if (vehicleMatch) key = vehicleMatch[1];
+
+	// Faction storages: faq_{factionId} -> faction
+	if (key.startsWith("faq_")) {
+		if (factionIdParam && key === `faq_${factionIdParam}`) return "faction";
+		return key; // keep as faq_### so it can still be selected
+	}
+
+	return key || null;
+}
+
 // In-app console logging
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
@@ -451,22 +616,12 @@ function renderSelectedItems() {
 
 	itemsList.innerHTML = "";
 
-	// Track items to remove (when storage is empty)
-	const itemsToRemove = [];
-
 	selectedItems.forEach((item, index) => {
 		const itemData = ITEM_WEIGHTS[item.itemId];
 		if (!itemData) return;
 
 		const currentInStorage = getRemainingInStorage(item.itemId);
 		const originalAmount = item.originalAmount || item.amount;
-
-		// Auto-remove if storage is empty (all items moved)
-		if (currentInStorage !== null && currentInStorage === 0) {
-			itemsToRemove.push(index);
-			console.log(`🗑️ Auto-removing ${itemData.name} (storage empty)`);
-			return; // Skip rendering this item
-		}
 
 		// Calculate how many were moved (original - current)
 		const movedAmount = currentInStorage !== null ? (originalAmount - currentInStorage) : 0;
@@ -501,18 +656,6 @@ function renderSelectedItems() {
 
 		itemsList.appendChild(entry);
 	});
-
-	// Remove items with empty storage (in reverse order to maintain indices)
-	for (let i = itemsToRemove.length - 1; i >= 0; i--) {
-		selectedItems.splice(itemsToRemove[i], 1);
-	}
-
-	// If items were removed, save and re-render
-	if (itemsToRemove.length > 0) {
-		saveSelectedItems();
-		renderSelectedItems(); // Re-render without removed items
-		return;
-	}
 
 	saveSelectedItems();
 	// Force immediate recalculation
@@ -715,12 +858,19 @@ async function fetchStorages() {
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
 
+	// If we're running in FiveM, do NOT fetch storages from API (0 charges, runtime-only)
+	if (runningInGame) {
+		console.log("⏭️ In FiveM: skipping API storages fetch (runtime-only, 0 charges)");
+		return;
+	}
+
 	if (!apiKey || !userId) {
 		showError("Please enter API Key and User ID");
 		return;
 	}
 
 	try {
+		console.log("🌐 Fetching from API (1 API charge)");
 		const data = await apiFetch(`storages/${userId}`, apiKey);
 		const storageList = data.storages || [];
 
@@ -800,14 +950,18 @@ function updateStorageFromChest(chestId, chestData) {
 	}
 }
 
-// Silent refresh for auto-polling (doesn't show errors)
+// Silent refresh for auto-polling (ALWAYS fetches fresh data)
 async function silentRefreshStorages() {
+	// If running in game, skip API calls - use runtime cache instead
+	if (runningInGame) {
+		console.log("⏭️ Skipping API call - using FiveM runtime data (0 charges)");
+		return;
+	}
+
 	const apiKey = localStorage.getItem("apiKey");
 	const userId = localStorage.getItem("userId");
 
-	if (!apiKey || !userId) {
-		return; // Silently skip if no credentials
-	}
+	if (!apiKey || !userId) return;
 
 	try {
 		const data = await apiFetch(`storages/${userId}`, apiKey);
@@ -818,14 +972,10 @@ async function silentRefreshStorages() {
 			return parsed;
 		}).filter(s => s !== null);
 
-		// Force complete UI refresh
-		renderSelectedItems(); // Updates "items left" counts
-		calculateRuns(); // Recalculates runs with new storage data
-
-		console.log("🔄 Auto-refreshed storage data - UI updated");
+		renderSelectedItems();
+		calculateRuns();
 	} catch (error) {
-		// Silently fail - don't interrupt user
-		console.log("⚠️ Auto-refresh failed (silent):", error.message);
+		console.error("Silent refresh failed:", error);
 	}
 }
 
@@ -1143,7 +1293,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Load settings after everything is set up
 	loadSettings();
-
+	
 	// Panel opacity listener
 	document.getElementById("panelOpacity").addEventListener("input", function () {
 		const userInput = document.getElementById("main").querySelector(".user-input");
@@ -1151,7 +1301,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		userInput.style.opacity = opacity;
 		localStorage.setItem("panelOpacity", opacity.toString());
 	});
-
+	
 	// Load storages if API key exists
 	if (savedApiKey && savedUserId) {
 		fetchStorages().then(() => {
@@ -1168,98 +1318,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		loadSettings();
 		calculateRuns();
 	}
-
-	// Listen for real-time storage updates from FiveM game client
-	window.addEventListener("message", function (event) {
-		if (!event.data) return;
-
-		try {
-			let data = event.data;
-
-			// Parse JSON if string
-			if (typeof data === "string") {
-				try {
-					data = JSON.parse(data);
-				} catch (e) {
-					return;
-				}
-			}
-
-			// Handle FiveM chest data (chest_[id] contains storage inventory)
-			// Check for any keys starting with "chest_"
-			for (const key in data) {
-				if (key.startsWith("chest_")) {
-					console.log(`📦 Chest data received: ${key}`);
-					console.log(JSON.stringify(data[key], null, 2));
-					const chestData = typeof data[key] === "string" ? JSON.parse(data[key]) : data[key];
-					updateStorageFromChest(key, chestData);
-					return;
-				}
-			}
-
-			// Handle inventory data (player's current inventory)
-			if (data.inventory) {
-				console.log(`🎒 Inventory data received`);
-				const inventoryData = typeof data.inventory === "string" ? JSON.parse(data.inventory) : data.inventory;
-				updateStorageFromChest("player_inventory", inventoryData);
-				return;
-			}
-
-			// Fallback: Handle old format storage messages
-			if (data.storages || data.storage || (data.type && data.type.includes("storage"))) {
-				console.log(`📨 Storage message received`);
-				updateStorageFromMessage(data);
-			}
-		} catch (error) {
-			console.error("❌ Error processing message:", error);
-		}
-	});
-
-	// Automatic refresh functionality
-	let autoRefreshInterval = null;
-
-	function startAutoRefresh() {
-		if (autoRefreshInterval) return; // Already running
-
-		console.log("🔄 Auto-refresh enabled - polling API every 30 seconds");
-
-		// Refresh immediately
-		silentRefreshStorages();
-
-		// Then refresh every 30 seconds
-		autoRefreshInterval = setInterval(() => {
-			silentRefreshStorages();
-		}, 30000); // 30 seconds
-	}
-
-	function stopAutoRefresh() {
-		if (autoRefreshInterval) {
-			clearInterval(autoRefreshInterval);
-			autoRefreshInterval = null;
-			console.log("⏸️ Auto-refresh disabled");
-		}
-	}
-
-	// Auto-refresh toggle handler
-	const autoRefreshCheckbox = document.getElementById('autoRefresh');
-	if (autoRefreshCheckbox) {
-		autoRefreshCheckbox.addEventListener('change', function () {
-			if (this.checked) {
-				startAutoRefresh();
-			} else {
-				stopAutoRefresh();
-			}
-		});
-
-		// Start if checked by default
-		if (autoRefreshCheckbox.checked) {
-			startAutoRefresh();
-		}
-	}
-
+	
 	console.log("✓ Runs Calculator initialized");
-	console.log("ℹ️ Storage data comes from API - click 'Fetch Storages' to update");
-
+	console.log("ℹ️ Storage data comes from API - click 'Fetch Storages' to update (runtime updates from FiveM use 0 charges)");
+	
 	// Console toggle
 	const showConsoleCheckbox = document.getElementById('showConsole');
 	const debugConsole = document.getElementById('debug-console');
@@ -1294,6 +1356,4 @@ document.addEventListener("DOMContentLoaded", function () {
 			isDragging = false;
 		});
 	}
-
-	console.log("✓ Runs Calculator initialized - listening for FiveM storage updates");
 });
