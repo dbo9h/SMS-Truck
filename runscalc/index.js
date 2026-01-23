@@ -1320,9 +1320,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		const data = event.data;
 		let storageUpdated = false;
+		
+		console.log("📨 FiveM message received:", Object.keys(data).filter(k => k.startsWith("chest_")).length, "chest keys");
 
 		// FiveM sends data as flat key-value pairs
 		// Look for chest_ keys which contain storage inventory
+		// Like Dogg: parse chest name to identify storage, then update that storage's items
+		const userId = localStorage.getItem("userId");
+		if (!userId) return; // Need userId to parse storage names
+		
 		for (const key in data) {
 			if (key.startsWith("chest_")) {
 				try {
@@ -1332,37 +1338,31 @@ document.addEventListener("DOMContentLoaded", function () {
 						chestInventory = JSON.parse(chestInventory);
 					}
 
-					// Update our storage data with this chest's inventory
-					if (chestInventory && typeof chestInventory === 'object') {
-						// Find matching storage and update item amounts
-						storages.forEach(storage => {
-							if (storage && storage.items) {
-								storage.items.forEach(storageItem => {
-									if (storageItem.item) {
-										const itemName = storageItem.item.name;
-										const itemId = storageItem.item.id;
-										const oldAmount = storageItem.amount;
+					if (!chestInventory || typeof chestInventory !== 'object') continue;
 
-										// Check if this item is in the chest data
-										let newAmount = null;
-										if (chestInventory[itemName] !== undefined) {
-											newAmount = parseInt(chestInventory[itemName]) || 0;
-										} else if (chestInventory[itemId] !== undefined) {
-											newAmount = parseInt(chestInventory[itemId]) || 0;
-										}
+					// Parse the chest name to identify which storage this is (like Dogg's oe function)
+					const parsedStorage = parseStorage(key, chestInventory, userId);
+					if (!parsedStorage) {
+						console.log(`⚠️ Could not parse storage from chest key: ${key}`);
+						continue;
+					}
 
-										if (newAmount !== null && oldAmount !== newAmount) {
-											console.log(`📦 ${itemName}: ${oldAmount} → ${newAmount} (from FiveM)`);
-											storageItem.amount = newAmount;
-											storageUpdated = true;
-										}
-									}
-								});
-							}
-						});
+					// Find the matching storage in our storages array
+					const storageIndex = storages.findIndex(s => s.storage.id === parsedStorage.storage.id);
+					if (storageIndex === -1) {
+						// New storage, add it
+						console.log(`✓ Adding new storage from FiveM: ${parsedStorage.storage.name}`);
+						storages.push(parsedStorage);
+						storageUpdated = true;
+					} else {
+						// Update existing storage - replace it with new data
+						const oldStorage = storages[storageIndex];
+						storages[storageIndex] = parsedStorage;
+						storageUpdated = true;
+						console.log(`✓ Updated storage from FiveM: ${parsedStorage.storage.name}`);
 					}
 				} catch (e) {
-					// Ignore parse errors
+					console.error(`Error processing chest ${key}:`, e);
 				}
 			}
 		}
@@ -1386,6 +1386,9 @@ document.addEventListener("DOMContentLoaded", function () {
 					}
 				}
 			});
+			
+			// Update storage dropdowns (preserving selected storage)
+			populateStorageDropdowns();
 			
 			// Like Dogg: if useItems AND autoRefresh are both enabled, automatically recalculate
 			if (useItemsEnabled && autoRefreshEnabled) {
