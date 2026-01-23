@@ -469,7 +469,10 @@ function renderSelectedItems() {
 		}
 
 		// Calculate how many were moved (original - current)
-		const movedAmount = currentInStorage !== null ? (originalAmount - currentInStorage) : 0;
+		// Handle case where items might be added back (current > original)
+		const movedAmount = currentInStorage !== null 
+			? Math.max(0, originalAmount - currentInStorage) 
+			: 0;
 
 		console.log(`📊 ${itemData.name}: original=${originalAmount}, current=${currentInStorage}, moved=${movedAmount}`);
 
@@ -529,6 +532,16 @@ function loadSelectedItems() {
 		if (saved) {
 			selectedItems = JSON.parse(saved);
 			selectedItems = selectedItems.filter(item => ITEM_WEIGHTS[item.itemId] !== undefined);
+			
+			// Initialize originalAmount for items that don't have it (backward compatibility)
+			selectedItems.forEach(item => {
+				if (!item.originalAmount) {
+					// Try to get current storage amount as fallback
+					const currentInStorage = getRemainingInStorage(item.itemId);
+					item.originalAmount = currentInStorage !== null ? currentInStorage : item.amount;
+				}
+			});
+			
 			renderSelectedItems();
 		}
 	} catch (e) {
@@ -580,30 +593,41 @@ function calculateRuns() {
 	// If no items selected, calculate runs for ALL items in storage
 	if (selectedItems.length > 0) {
 		console.log(`📊 Calculating runs for ${selectedItems.length} selected items`);
-		// Calculate runs based on items MOVED (original - current in storage)
+		// Calculate runs based on items ACTUALLY LEFT in storage
 		selectedItems.forEach(item => {
 			const itemData = ITEM_WEIGHTS[item.itemId];
 			if (!itemData) return;
 
-			// Get current amount in source storage
+			// Get current amount in source storage (real-time from API)
 			const currentInStorage = getRemainingInStorage(item.itemId);
 			const originalAmount = item.originalAmount || item.amount;
 
+			// If we can't get current storage, skip this item
+			if (currentInStorage === null) {
+				console.log(`  - ${itemData.name}: skipped (storage data unavailable)`);
+				return;
+			}
+
 			// Calculate how many were already moved (original storage - current storage)
-			const alreadyMoved = currentInStorage !== null ? Math.max(0, originalAmount - currentInStorage) : 0;
+			const alreadyMoved = Math.max(0, originalAmount - currentInStorage);
 
-			// Calculate how much is LEFT to move (user's target - already moved)
-			const leftToMove = Math.max(0, item.amount - alreadyMoved);
+			// Calculate how much is LEFT to move
+			// Use the minimum of: (target - already moved) OR (what's actually in storage)
+			// This ensures we don't calculate runs for more items than actually exist
+			const remainingTarget = Math.max(0, item.amount - alreadyMoved);
+			const amountToCalculate = Math.min(remainingTarget, currentInStorage);
 
-			// Calculate runs based on what's LEFT to move
-			const amountToCalculate = leftToMove;
+			// Skip if nothing left to move
+			if (amountToCalculate <= 0) {
+				console.log(`  - ${itemData.name}: completed (${item.amount} target reached, ${alreadyMoved} moved)`);
+				return;
+			}
 
 			const weight = amountToCalculate * itemData.weight;
 			const runs = Math.ceil(weight / capacity);
 
-			// Skip items with 0 runs (already completed)
+			// Skip items with 0 runs (shouldn't happen due to check above, but safety)
 			if (runs === 0) {
-				console.log(`  - ${itemData.name}: completed (${item.amount} target reached)`);
 				return;
 			}
 
@@ -615,7 +639,7 @@ function calculateRuns() {
 			runDiv.innerHTML = `<span class="item-name">${itemData.name}:</span> <span class="run-count">${runs}</span> run${runs !== 1 ? 's' : ''}`;
 			perItemRunsDiv.appendChild(runDiv);
 
-			console.log(`  - ${itemData.name}: ${runs} runs (${leftToMove} left to move: ${item.amount} target - ${alreadyMoved} moved)`);
+			console.log(`  - ${itemData.name}: ${runs} runs (${amountToCalculate} left to move: ${currentInStorage} in storage, ${alreadyMoved} already moved, ${item.amount} target)`);
 		});
 	} else {
 		console.log(`📊 Calculating runs for ALL items in storage (${storage.items.length} items)`);
