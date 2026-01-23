@@ -235,10 +235,20 @@ function updateStorageFromMessage(messageData) {
 		}
 	});
 	
-	renderSelectedItems(); // This will update "items left" counts
-	calculateRuns(); // This will recalculate runs with new amounts
-
-	console.log("✅ Storage data updated from FiveM (no API charge, useItems enabled)");
+	// Like Dogg: if useItems AND autoRefresh are both enabled, automatically recalculate
+	const useItemsEnabled = document.getElementById("useItems")?.checked ?? true;
+	const autoRefreshEnabled = document.getElementById("autoRefresh")?.checked ?? false;
+	
+	if (useItemsEnabled && autoRefreshEnabled) {
+		// Both enabled: automatically update UI and recalculate
+		renderSelectedItems();
+		calculateRuns();
+		console.log("✅ Storage updated from FiveM - auto-refresh recalculated (no API charge)");
+	} else {
+		// Storage data updated but auto-refresh disabled - just update data
+		renderSelectedItems(); // Update display with new storage amounts
+		console.log("✅ Storage updated from FiveM (auto-refresh disabled, manual refresh needed)");
+	}
 }
 
 function toggleSettings() {
@@ -1357,9 +1367,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		}
 
-		// If storage was updated, refresh the UI
-		// autoRefresh controls whether to automatically recalculate when storage updates
+		// If storage was updated, refresh the UI automatically (like Dogg's implementation)
+		// useItems + autoRefresh must both be enabled for automatic recalculation
 		if (storageUpdated) {
+			const useItemsEnabled = document.getElementById("useItems")?.checked ?? true;
+			const autoRefreshEnabled = document.getElementById("autoRefresh")?.checked ?? false;
+			
 			// Verify and preserve originalAmount when storage updates
 			selectedItems.forEach(item => {
 				// originalAmount should never change - it's the baseline
@@ -1374,24 +1387,23 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			});
 			
-			// Check if autoRefresh is enabled - if so, automatically recalculate
-			const autoRefresh = document.getElementById("autoRefresh")?.checked ?? false;
-			if (autoRefresh) {
+			// Like Dogg: if useItems AND autoRefresh are both enabled, automatically recalculate
+			if (useItemsEnabled && autoRefreshEnabled) {
+				// Both enabled: automatically update UI and recalculate
 				renderSelectedItems();
 				calculateRuns();
 				console.log("✅ Storage updated from FiveM - auto-refresh recalculated (no API charge)");
-			} else {
-				// autoRefresh disabled - just update the data, don't recalculate
-				console.log("✅ Storage updated from FiveM (auto-refresh disabled, manual refresh needed)");
+			} else if (useItemsEnabled) {
+				// useItems enabled but autoRefresh disabled - update UI to show new amounts, but don't recalculate runs
+				renderSelectedItems(); // Update display with new storage amounts
+				console.log("✅ Storage updated from FiveM (auto-refresh disabled, UI updated but runs not recalculated)");
 			}
+			// If useItems is disabled, we already returned early, so we won't reach here
 		}
 	});
 
 	console.log("✓ Runs Calculator initialized");
-	console.log("ℹ️ Auto-refresh enabled at 1 second (uses cache - minimal API charges)");
-
-	console.log("✓ Runs Calculator initialized");
-	console.log("ℹ️ Auto-refresh: When enabled, automatically recalculates when storage updates from FiveM");
+	console.log("ℹ️ useItems + autoRefresh: When both enabled, automatically updates and recalculates from FiveM (no API charge)");
 
 	// Console toggle
 	const showConsoleCheckbox = document.getElementById('showConsole');
