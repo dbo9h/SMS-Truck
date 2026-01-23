@@ -959,16 +959,31 @@ function updateStorageFromChest(chestId, chestData) {
 
 function parseStorage(storageName, inventory, userId) {
 	// Parse storage ID from name (similar to Dogg's H function)
-	let storageId = storageName.replace(/^chest_u\d+/, "").replace(/^chest_self_storage:\d+:(.+):chest$/, "$1").replace(/^_/, "");
+	// FiveM sends chest data as "chest_[storage_id]" - we need to extract the storage_id
+	let storageId = storageName;
+	
+	// Remove chest_ prefix if present (FiveM format: chest_biz_train -> biz_train)
+	if (storageId.startsWith("chest_")) {
+		storageId = storageId.substring(6); // Remove "chest_" prefix
+	}
+	
+	// Handle user-specific chests (chest_u12345 -> remove prefix)
+	storageId = storageId.replace(new RegExp(`^u${userId}`), "").replace(/^_/, "");
+	
+	// Handle self storage format: chest_self_storage:12345:storage_id:chest
+	const selfStorageMatch = storageName.match(/^chest_self_storage:\d+:(.+):chest$/);
+	if (selfStorageMatch) {
+		storageId = selfStorageMatch[1];
+	}
 
-	// Handle vehicle storage names
-	const vehicleMatch = storageName.match(/^veh_\w+_(.+)$/);
+	// Handle vehicle storage names (veh_model_storage_id -> extract storage_id)
+	const vehicleMatch = storageId.match(/^veh_\w+_(.+)$/);
 	if (vehicleMatch) {
 		storageId = vehicleMatch[1];
 	}
 
-	// Skip invalid storage names
-	if (/^chest_u\d+/.test(storageName) || /^chest_self_storage:\d+:/.test(storageName)) {
+	// Skip invalid storage names (user inventory chests, etc.)
+	if (/^u\d+/.test(storageId) || /^self_storage:\d+:/.test(storageId)) {
 		return null;
 	}
 
@@ -1321,26 +1336,44 @@ document.addEventListener("DOMContentLoaded", function () {
 		const data = event.data;
 		let storageUpdated = false;
 		
-		console.log("📨 FiveM message received:", Object.keys(data).filter(k => k.startsWith("chest_")).length, "chest keys");
-
 		// FiveM sends data as flat key-value pairs
-		// Look for chest_ keys which contain storage inventory
+		// Look for chest_ keys which contain storage inventory (JSON string)
+		// According to docs: chest_[chest_id] contains JSON of inventory, only updates when chest is opened
+		const chestKeys = Object.keys(data).filter(k => k.startsWith("chest_"));
+		if (chestKeys.length > 0) {
+			console.log(`📨 FiveM message: ${chestKeys.length} chest update(s) received`);
+		}
+
 		// Like Dogg: parse chest name to identify storage, then update that storage's items
 		const userId = localStorage.getItem("userId");
-		if (!userId) return; // Need userId to parse storage names
+		if (!userId) {
+			if (chestKeys.length > 0) {
+				console.log("⚠️ No userId set, cannot process chest updates");
+			}
+			return; // Need userId to parse storage names
+		}
 		
 		for (const key in data) {
 			if (key.startsWith("chest_")) {
 				try {
-					// Parse the chest data
+					// Parse the chest data - FiveM sends it as JSON string
 					let chestInventory = data[key];
 					if (typeof chestInventory === 'string') {
-						chestInventory = JSON.parse(chestInventory);
+						try {
+							chestInventory = JSON.parse(chestInventory);
+						} catch (parseError) {
+							console.error(`Failed to parse chest inventory for ${key}:`, parseError);
+							continue;
+						}
 					}
 
-					if (!chestInventory || typeof chestInventory !== 'object') continue;
+					if (!chestInventory || typeof chestInventory !== 'object') {
+						console.log(`⚠️ Invalid chest inventory for ${key}`);
+						continue;
+					}
 
 					// Parse the chest name to identify which storage this is (like Dogg's oe function)
+					// key is like "chest_biz_train", parseStorage will extract "biz_train"
 					const parsedStorage = parseStorage(key, chestInventory, userId);
 					if (!parsedStorage) {
 						console.log(`⚠️ Could not parse storage from chest key: ${key}`);
@@ -1351,15 +1384,15 @@ document.addEventListener("DOMContentLoaded", function () {
 					const storageIndex = storages.findIndex(s => s.storage.id === parsedStorage.storage.id);
 					if (storageIndex === -1) {
 						// New storage, add it
-						console.log(`✓ Adding new storage from FiveM: ${parsedStorage.storage.name}`);
+						console.log(`✓ Adding new storage from FiveM: ${parsedStorage.storage.name} (${parsedStorage.items.length} items)`);
 						storages.push(parsedStorage);
 						storageUpdated = true;
 					} else {
-						// Update existing storage - replace it with new data
+						// Update existing storage - replace it with new data (like Dogg's Ir function)
 						const oldStorage = storages[storageIndex];
 						storages[storageIndex] = parsedStorage;
 						storageUpdated = true;
-						console.log(`✓ Updated storage from FiveM: ${parsedStorage.storage.name}`);
+						console.log(`✓ Updated storage from FiveM: ${parsedStorage.storage.name} (${parsedStorage.items.length} items)`);
 					}
 				} catch (e) {
 					console.error(`Error processing chest ${key}:`, e);
@@ -1390,16 +1423,20 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Update storage dropdowns (preserving selected storage)
 			populateStorageDropdowns();
 			
-			// Like Dogg: if useItems AND autoRefresh are both enabled, automatically recalculate
-			if (useItemsEnabled && autoRefreshEnabled) {
-				// Both enabled: automatically update UI and recalculate
+			// When useItems is enabled, ALWAYS update the UI to show new storage amounts
+			// autoRefresh controls whether to also recalculate runs automatically
+			if (useItemsEnabled) {
+				// Always update UI to show new storage amounts (item quantities, moved amounts, etc.)
 				renderSelectedItems();
-				calculateRuns();
-				console.log("✅ Storage updated from FiveM - auto-refresh recalculated (no API charge)");
-			} else if (useItemsEnabled) {
-				// useItems enabled but autoRefresh disabled - update UI to show new amounts, but don't recalculate runs
-				renderSelectedItems(); // Update display with new storage amounts
-				console.log("✅ Storage updated from FiveM (auto-refresh disabled, UI updated but runs not recalculated)");
+				
+				if (autoRefreshEnabled) {
+					// Both enabled: also automatically recalculate runs
+					calculateRuns();
+					console.log("✅ Storage updated from FiveM - UI updated and runs recalculated (no API charge)");
+				} else {
+					// useItems enabled but autoRefresh disabled - UI updated but runs not recalculated
+					console.log("✅ Storage updated from FiveM - UI updated (auto-refresh disabled, runs not recalculated)");
+				}
 			}
 			// If useItems is disabled, we already returned early, so we won't reach here
 		}
