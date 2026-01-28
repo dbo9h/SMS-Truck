@@ -329,11 +329,6 @@ document.getElementById("reloadButton").addEventListener("click", function () {
   window.location.reload();
 });
 
-document.getElementById('refresh-data').addEventListener("click", function () {
-  console.log("🔄 Manually requesting data refresh...");
-  window.parent.postMessage({ type: "getData" }, "*");
-});
-
 
 function restoreTrackerPosition() {
   const pos = localStorage.getItem(TRACKER_POSITION_KEY);
@@ -366,14 +361,7 @@ function init() {
 
   renderSummary();
 
-  // Request data immediately and retry a few times to ensure we get initial data
-  console.log("📡 Requesting initial data...");
   window.parent.postMessage({ type: "getData" }, "*");
-
-  // Retry after short delays to catch initial inventory
-  setTimeout(() => window.parent.postMessage({ type: "getData" }, "*"), 500);
-  setTimeout(() => window.parent.postMessage({ type: "getData" }, "*"), 1000);
-  setTimeout(() => window.parent.postMessage({ type: "getData" }, "*"), 2000);
 }
 
 
