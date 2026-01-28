@@ -1,15 +1,16 @@
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <title>BXP Multi-Job Tracker</title>
+  <title>Mineshaft Tracker</title>
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
   <div id="tracker-app" class="new-ui" style="position:absolute; left:40px; top:40px;">
     <header id="drag-handle">
-      <div class="drag-title">BXP Tracker</div>
+      <div class="drag-title">Mineshaft Tracker</div>
       <div id="settings-icon" title="Settings">⚙️</div>
     </header>
     <main>
@@ -22,7 +23,10 @@
       <section id="bxp-summary-section">
         <table id="bxp-summary-table">
           <thead>
-            <tr><th>Job</th><th>BXP</th><th>BXP/hr</th><th>BXP/min</th></tr>
+            <tr>
+              <th>Item</th>
+              <th>Value</th>
+            </tr>
           </thead>
           <tbody id="summary-tbody"></tbody>
         </table>
@@ -44,4 +48,5 @@
   </aside>
   <script src="script.js"></script>
 </body>
+
 </html>

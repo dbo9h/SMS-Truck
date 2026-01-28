@@ -4,51 +4,17 @@ const TRACKER_SIZE_KEY = "bxp_tracker_size";
 const BXP_FONT_SIZE_KEY = "bxp-row-font-size";
 
 const JOBS = [
-  { key: "business", label: "Business" },
-  { key: "cargopilot", label: "Cargo" },
-  { key: "conductor", label: "Train" },
-  { key: "emergency", label: "EMS" },
-  { key: "farmer", label: "Farming" },
-  { key: "fisher", label: "Fishing" },
-  { key: "firefighter", label: "Firefighting" },
-  { key: "garbage", label: "Garbage" },
-  { key: "helicopterpilot", label: "Helicopter" },
-  { key: "hunter", label: "Hunting" },
-  { key: "mechanic", label: "Mechanic" },
-  { key: "miner", label: "Mining" },
-  { key: "pilot", label: "Airline" },
-  { key: "player", label: "Player" },
-  { key: "postop", label: "PostOP" },
-  { key: "racer", label: "Racing" },
-  { key: "strength", label: "Strength" },
-  { key: "trucker", label: "Trucking" },
-  { key: "busdriver", label: "Bus Driver" }
+  { key: "miner", label: "Copper Ore" },
+  { key: "iron", label: "Iron Ore" }
 ];
 
 const JOB_BXP_KEYS = {
-  trucker: { bxpTokenKey: "exp_token_a|trucking|trucking", label: "Trucking BXP" },
-  mechanic: { bxpTokenKey: "exp_token_a|trucking|mechanic", label: "Mechanic BXP" },
-  garbage: { bxpTokenKey: "exp_token_a|trucking|garbage", label: "Garbage BXP" },
-  postop: { bxpTokenKey: "exp_token_a|trucking|postop", label: "PostOP BXP" },
-  pilot: { bxpTokenKey: "exp_token_a|piloting|piloting", label: "Airline BXP" },
-  helicopterpilot: { bxpTokenKey: "exp_token_a|piloting|heli", label: "Helicopter BXP" },
-  cargopilot: { bxpTokenKey: "exp_token_a|piloting|cargos", label: "Cargo BXP" },
-  busdriver: { bxpTokenKey: "exp_token_a|train|bus", label: "Bus Driver BXP" },
-  conductor: { bxpTokenKey: "exp_token_a|train|train", label: "Train BXP" },
-  emergency: { bxpTokenKey: "exp_token_a|ems|ems", label: "EMS BXP" },
-  firefighter: { bxpTokenKey: "exp_token_a|ems|fire", label: "Firefighting BXP" },
-  racer: { bxpTokenKey: "exp_token_a|player|racing", label: "Racing BXP" },
-  farmer: { bxpTokenKey: "exp_token_a|farming|farming", label: "Farming BXP" },
-  fisher: { bxpTokenKey: "exp_token_a|farming|fishing", label: "Fishing BXP" },
-  miner: { bxpTokenKey: "mining_copper", label: "Mining BXP" },
-  business: { bxpTokenKey: "exp_token_a|business|business", label: "Business BXP" },
-  hunter: { bxpTokenKey: "exp_token_a|hunting|skill", label: "Hunting BXP" },
-  player: { bxpTokenKey: "exp_token_a|player|player", label: "Player BXP" },
-  strength: { bxpTokenKey: "exp_token_a|physical|strength", label: "Strength BXP" },
+  miner: { bxpTokenKey: "mining_copper", label: "Copper Ore" },
+  iron: { bxpTokenKey: "mining_iron", label: "Iron Ore" }
 };
 
 
-let selectedJobs = new Set();
+let selectedJobs = new Set(["miner", "iron"]);
 let bxpLogs = {};
 let lastBxp = {};
 let hasFirstGain = {};
@@ -137,73 +103,27 @@ function restoreTrackerSize() {
   }
 }
 
-function renderJobList() {
-  jobListEl.innerHTML = '';
-  const sortedJobs = [...JOBS].sort((a, b) => a.label.localeCompare(b.label));
-  sortedJobs.forEach(job => {
-    const label = document.createElement('label');
-    label.className = 'job-checkbox-label';
-    if (selectedJobs.has(job.key)) label.classList.add('selected');
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.value = job.key;
-    input.checked = selectedJobs.has(job.key);
-    input.onchange = function () {
-      if (this.checked) selectedJobs.add(job.key);
-      else selectedJobs.delete(job.key);
-      label.classList.toggle('selected', this.checked);
-      saveSelectedJobs();
-      renderSummary();
-    };
-    label.appendChild(input);
-    label.appendChild(document.createTextNode(job.label));
-    jobListEl.appendChild(label);
-  });
-}
+// Job list removed - only tracking mining now
 
 function saveSelectedJobs() {
   localStorage.setItem(SELECTED_JOBS_KEY, JSON.stringify(Array.from(selectedJobs)));
 }
 function loadSelectedJobs() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(SELECTED_JOBS_KEY));
-    if (Array.isArray(stored)) {
-      selectedJobs = new Set(stored);
-    }
-  } catch (e) {
-    selectedJobs = new Set();
-  }
+  // Always default to miner and iron
+  selectedJobs = new Set(["miner", "iron"]);
 }
 
 function renderSummary() {
   summaryTbody.innerHTML = '';
 
-  const showHr = toggleBxpHr.checked;
-  const showMin = toggleBxpMin.checked;
-
-  const table = document.getElementById('bxp-summary-table');
-  const thead = table.querySelector('thead');
-  thead.innerHTML = `
-    <tr>
-      <th>Job</th>
-      <th>BXP</th>
-      ${showHr ? '<th>BXP/hr</th>' : ''}
-      ${showMin ? '<th>BXP/min</th>' : ''}
-    </tr>
-  `;
-
   selectedJobs.forEach(jobKey => {
     const jobObj = JOBS.find(j => j.key === jobKey);
     const bxp = typeof lastBxp[jobKey] === "number" ? lastBxp[jobKey] : 0;
-    const bxpPerHour = getBxpPerHour(jobKey);
-    const bxpPerMinute = getBxpPerMinute(jobKey);
 
     summaryTbody.innerHTML += `
       <tr>
         <td>${jobObj.label}</td>
         <td>${bxp.toLocaleString()}</td>
-        ${showHr ? `<td>${bxpPerHour !== null ? bxpPerHour.toLocaleString() : '—'}</td>` : ''}
-        ${showMin ? `<td>${bxpPerMinute !== null ? bxpPerMinute.toLocaleString() : '—'}</td>` : ''}
       </tr>
     `;
   });
@@ -270,15 +190,19 @@ window.addEventListener('message', (event) => {
     if (!jobInfo) return;
 
     const expectedKey = jobInfo.bxpTokenKey;
-    const altKey = expectedKey.replace("exp_token_a|", "exp_token|");
 
-    const primaryAmount = invObj[expectedKey]?.amount ?? 0;
-    const secondaryAmount = invObj[altKey]?.amount ?? 0;
-    const combinedAmount = primaryAmount + secondaryAmount;
-
-    if (primaryAmount === 0 && secondaryAmount === 0 && !(expectedKey in invObj) && !(altKey in invObj)) return;
-
-    const amount = combinedAmount;
+    // For mining items (copper/iron), just read directly. For BXP tokens, check both exp_token_a and exp_token variants
+    let amount;
+    if (expectedKey === "mining_copper" || expectedKey === "mining_iron") {
+      amount = invObj[expectedKey]?.amount ?? 0;
+      if (amount === 0 && !(expectedKey in invObj)) return;
+    } else {
+      const altKey = expectedKey.replace("exp_token_a|", "exp_token|");
+      const primaryAmount = invObj[expectedKey]?.amount ?? 0;
+      const secondaryAmount = invObj[altKey]?.amount ?? 0;
+      amount = primaryAmount + secondaryAmount;
+      if (primaryAmount === 0 && secondaryAmount === 0 && !(expectedKey in invObj) && !(altKey in invObj)) return;
+    }
 
     if (!bxpLogs[jobKey]) bxpLogs[jobKey] = [];
 
@@ -399,13 +323,7 @@ const escapeListener = (e) => {
 };
 window.addEventListener('keydown', escapeListener);
 
-document.getElementById('toggle-job-list').onclick = () => {
-  const jobList = document.getElementById('job-list');
-  const toggleBtn = document.getElementById('toggle-job-list');
-  const currentlyVisible = jobList.style.display === 'flex';
-  jobList.style.display = currentlyVisible ? 'none' : 'flex';
-  toggleBtn.textContent = currentlyVisible ? '▶' : '▼';
-};
+// Toggle job list removed - only tracking mining now
 
 document.getElementById("reloadButton").addEventListener("click", function () {
   window.location.reload();
@@ -441,7 +359,6 @@ function init() {
     console.warn("⚠️ Failed to restore BXP data from localStorage");
   }
 
-  renderJobList();
   renderSummary();
 
   window.parent.postMessage({ type: "getData" }, "*");
